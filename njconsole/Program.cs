@@ -9,13 +9,12 @@ namespace NjConsole
     class Program
     {
         static JSession jsm = null;
-        static StringBuilder input = null;
+        static string input = null;
 
         static int Main(string[] args)
         {
             try
             {
-                input = new StringBuilder();
                 using (jsm = new JSession())
                 {
                     Console.CancelKeyPress += (sender, e) =>
@@ -69,51 +68,48 @@ namespace NjConsole
                 jsm.IncAdBreak();
             }
             else {
-                input = new StringBuilder(line);
+                input = line;
             }
-            return input.ToString();
+            return input;
         }
 
         static void addargv(string[] args)
         {
-            input.Append(",<'");
-            input.Append(Assembly.GetExecutingAssembly().Location.Replace('\\', '/'));
-            input.Append("'");
-            bool firstArg = true;
+            var sb = new StringBuilder();
+            if (0 == args.Length)
+            {
+                sb.Append(",<");
+            }
+            sb.Append('\'');
+            sb.Append(Assembly.GetExecutingAssembly().Location.Replace('\\', '/'));
+            sb.Append('\'');
             foreach (var arg in args)
             {
-                if (firstArg)
-                {
-                    input.Append(",<");
-                    firstArg = false;
-                }
-                input.Append(";'");
-                input.Append(arg.Replace("'", "''"));
-                input.Append('\'');
+                sb.Append(";'");
+                sb.Append(arg.Replace("'", "''"));
+                sb.Append('\'');
             }
+            input = sb.ToString();
         }
 
         static int jefirst(int type)
         {
-            const string ijx = "11!:0'pc ijx closeok;xywh 0 0 300 200;cc e editijx rightmove bottommove ws_vscroll ws_hscroll;setfont e \"Courier New\" 12;setfocus e;pas 0 0;pgroup jijx;pshow;'[18!:4<'base'";
             var init = new StringBuilder();
             if (0 == type)
             {
-                init.Append("(3 : '0!:0 y')<BINPATH,'");
-                init.Append("\\");
-                init.Append("profile.ijs'");
+                init.Append("(3 : '0!:0 y')<BINPATH,'/profile.ijs'");
             }
             else if (1 == type)
                 init.Append("(3 : '0!:0 y')2{ARGV");
             else if (2 == type)
-                init.Append(ijx);
+                init.Append("11!:0'pc ijx closeok;xywh 0 0 300 200;cc e editijx rightmove bottommove ws_vscroll ws_hscroll;setfont e \"Courier New\" 12;setfocus e;pas 0 0;pgroup jijx;pshow;'[18!:4<'base'");
             else
                 init.Append("i.0 0");
             init.Append("[ARGV_z_=:");
             init.Append(input);
             init.Append("[BINPATH_z_=:'");
             init.Append(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).Replace('\\', '/'));
-            init.Append("'");
+            init.Append('\'');
             return jsm.Do(init.ToString());
         }
     }
