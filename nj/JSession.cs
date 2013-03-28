@@ -34,7 +34,6 @@ namespace Nj
             this._sid = -1;
             this._callbacks = new IntPtr[5];
             this._callbacks[0] = this._callbacks[1] = this._callbacks[2] = this._callbacks[3] = this._callbacks[4] = IntPtr.Zero;
-            IntPtr.Subtract(new IntPtr(), 2);
             this._disposed = false;
             this._sid = JInit(); // might throw exception
         }
@@ -145,7 +144,7 @@ namespace Nj
         private static extern int JDo(int sid, [MarshalAs(UnmanagedType.LPStr)]string sentence);
 
         [DllImport(_dllName)]
-        private static extern StringBuilder JGetLocale(int sid);
+        private static extern string JGetLocale(int sid);
 
         [DllImport(_dllName)]
         private static extern System.IntPtr JGetA(int sid, int n, [MarshalAs(UnmanagedType.LPStr)]string name);

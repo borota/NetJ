@@ -1,5 +1,7 @@
 ﻿using Nj;
 using System;
+using System.IO;
+using System.Reflection;
 using System.Text;
 
 namespace NjConsole
@@ -75,7 +77,7 @@ namespace NjConsole
         static void addargv(string[] args)
         {
             input.Append(",<'");
-            input.Append(System.Reflection.Assembly.GetExecutingAssembly().Location.Replace('\\', '/'));
+            input.Append(Assembly.GetExecutingAssembly().Location.Replace('\\', '/'));
             input.Append("'");
             bool firstArg = true;
             foreach (var arg in args)
@@ -110,7 +112,7 @@ namespace NjConsole
             init.Append("[ARGV_z_=:");
             init.Append(input);
             init.Append("[BINPATH_z_=:'");
-            init.Append(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location).Replace('\\', '/'));
+            init.Append(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).Replace('\\', '/'));
             init.Append("'");
             return jsm.Do(init.ToString());
         }

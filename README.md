@@ -3,7 +3,7 @@ NetJ
 
 .NET support for J engine via PInvoke
 
-Visual Studio 2012 Solution.
+Visual Studio 2012 Solution. It works with the free Express for Windows Desktop as well.
 
  * jsm - c code implementing j session management.
 

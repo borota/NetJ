@@ -12,13 +12,13 @@ extern "C" {
 #endif 
     int  __stdcall JInit();
     int  __stdcall JSM(int, void**);
-	int  __stdcall JDo(int, C*);
-	C*   __stdcall JGetLocale(int);
-	A    __stdcall JGetA(int, I, C*);
+    int  __stdcall JDo(int, C*);
+    C*   __stdcall JGetLocale(int);
+    A    __stdcall JGetA(int, I, C*);
     int  __stdcall JGetM(int, C*, I*, I*, I*, I*);
-	I    __stdcall JSetA(int, I, C*, I, C*);
+    I    __stdcall JSetA(int, I, C*, I, C*);
     int  __stdcall JSetM(int, C*, I*, I*, I*, I*);
-	A    __stdcall Jga(int, I, I, I, I*);
+    A    __stdcall Jga(int, I, I, I, I*);
     int  __stdcall JErrorTextM(int, I, I*);
     int  __stdcall JFree(int);
     int  __stdcall JDoR(int, C*, VARIANT*);
@@ -29,11 +29,11 @@ extern "C" {
     int  __stdcall JErrorText(int, I, VARIANT*);
     int  __stdcall JErrorTextB(int, I, VARIANT*);
     int  __stdcall JTranspose(int, I);
-	int  __stdcall JBreak(int);
-	int  __stdcall JClear(int);
-	int  __stdcall JIsBusy(int);
-	void*__stdcall JGetJt(int);
-	C    __stdcall JIncAdBreak(int);
+    int  __stdcall JBreak(int);
+    int  __stdcall JClear(int);
+    int  __stdcall JIsBusy(int);
+    void*__stdcall JGetJt(int);
+    C    __stdcall JIncAdBreak(int);
 #ifdef __cplusplus
 }
 #endif

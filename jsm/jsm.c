@@ -18,38 +18,38 @@ static HMODULE hJdll = NULL;
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
-	switch (ul_reason_for_call)
-	{
-	case DLL_PROCESS_ATTACH:
-		jtMutex = CreateMutex(NULL, FALSE, NULL);
-		if (NULL == jtMutex) {
-			printf("CreateMutex error: %d\n", GetLastError());
-			return FALSE;
-		}
-		if (FALSE == GetJProcAddresses(hModule)) {
-			return FALSE;
-		}
-		break;
-	case DLL_THREAD_ATTACH:
-		break;
-	case DLL_THREAD_DETACH:
-		break;
-	case DLL_PROCESS_DETACH:
-		if (NULL != jts) {
-			free(jts);
-			jts = NULL;
-		}
-		if (NULL != jtMutex) {
-			CloseHandle(jtMutex);
-			jtMutex = NULL;
-		}
-		if (NULL != hJdll) {
-			FreeLibrary(hJdll);
-			hJdll = NULL;
-		}
-		break;
-	}
-	return TRUE;
+    switch (ul_reason_for_call)
+    {
+    case DLL_PROCESS_ATTACH:
+        jtMutex = CreateMutex(NULL, FALSE, NULL);
+        if (NULL == jtMutex) {
+            printf("CreateMutex error: %d\n", GetLastError());
+            return FALSE;
+        }
+        if (FALSE == GetJProcAddresses(hModule)) {
+            return FALSE;
+        }
+        break;
+    case DLL_THREAD_ATTACH:
+        break;
+    case DLL_THREAD_DETACH:
+        break;
+    case DLL_PROCESS_DETACH:
+        if (NULL != jts) {
+            free(jts);
+            jts = NULL;
+        }
+        if (NULL != jtMutex) {
+            CloseHandle(jtMutex);
+            jtMutex = NULL;
+        }
+        if (NULL != hJdll) {
+            FreeLibrary(hJdll);
+            hJdll = NULL;
+        }
+        break;
+    }
+    return TRUE;
 }
 
 typedef void* (__stdcall *JInitType)       ();
@@ -100,305 +100,308 @@ static JIsBusyType     jisbusy;
 
 int __stdcall JInit()
 {
-	DWORD dwWaitResult;
-	void** njts = NULL;
+    DWORD dwWaitResult;
+    void** njts = NULL;
 
-	dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
+    dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
     switch (dwWaitResult)
     {
     case WAIT_OBJECT_0:
         __try {
-			if (++jtIdx >= jtSz) {
-				njts = (void**)calloc(jtSz + MEMCHUNCK, sizeof(void*));
-				if (NULL != njts) {
-					if (NULL != jts) {
-						memcpy(njts, jts, jtSz * sizeof(void*));
-						free(jts);
-					}
-					jts = njts;
-					jtSz += MEMCHUNCK;
-					jts[jtIdx] = jinit();
-				}
-				else {
-					printf("calloc error: %d\n", errno);
-					return -1;
-				}
-			}
+            if (++jtIdx >= jtSz) {
+                njts = (void**)calloc(jtSz + MEMCHUNCK, sizeof(void*));
+                if (NULL != njts) {
+                    if (NULL != jts) {
+                        memcpy(njts, jts, jtSz * sizeof(void*));
+                        free(jts);
+                    }
+                    jts = njts;
+                    jtSz += MEMCHUNCK;
+                    jts[jtIdx] = jinit();
+                }
+                else {
+                    printf("calloc error: %d\n", errno);
+                    return -1;
+                }
+            } 
+            else {
+                jts[jtIdx] = jinit();
+            }
         }
         __finally {
             if (!ReleaseMutex(jtMutex))
             {
-				printf("Failed to release mutex. Error %d\n", GetLastError());
+                printf("Failed to release mutex. Error %d\n", GetLastError());
             }
         }
         break;
     case WAIT_ABANDONED:
         printf("Warning: abandoned mutex. Error %d\n", GetLastError());
-		return -3;
+        return -3;
     }
-	return jtIdx;
+    return jtIdx;
 }
 
 void* GetJt(int idx) 
 {
-	void* jt = NULL;
-	if (!(idx >= 0 && idx <= jtIdx)) {
-		printf("Invalid session id %d passed.\n", idx);
-		return NULL;
-	}
-	return jts[idx];
+    void* jt = NULL;
+    if (!(idx >= 0 && idx <= jtIdx)) {
+        printf("Invalid session id %d passed.\n", idx);
+        return NULL;
+    }
+    return jts[idx];
 }
 
 int __stdcall JSM(int idx, void* callbacks[])
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	jsm(jt, callbacks);
-	return idx;
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    jsm(jt, callbacks);
+    return idx;
 }
 
 int  __stdcall JDo(int idx, C* sentence)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jdo(jt, sentence);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jdo(jt, sentence);
 }
 
 C* __stdcall JGetLocale(int idx)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return NULL;
-	}
-	return jgetlocale(jt);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return NULL;
+    }
+    return jgetlocale(jt);
 }
 
 A __stdcall JGetA(int idx, I n, C* name)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return NULL;
-	}
-	return jgeta(jt, n, name);	
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return NULL;
+    }
+    return jgeta(jt, n, name);
 }
 
 int __stdcall JGetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata) 
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jgetm(jt, name, jtype, jrank, jshape, jdata);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jgetm(jt, name, jtype, jrank, jshape, jdata);
 }
 
 I __stdcall JSetA(int idx, I n, C* name, I dlen, C* d)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jseta(jt, n, name, dlen, d);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jseta(jt, n, name, dlen, d);
 }
 
 int __stdcall JSetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jsetm(jt, name, jtype, jrank, jshape, jdata);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jsetm(jt, name, jtype, jrank, jshape, jdata);
 }
 
 A __stdcall Jga(int idx, I t, I n, I r, I*s)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return NULL;
-	}
-	return jga(jt, t, n, r, s);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return NULL;
+    }
+    return jga(jt, t, n, r, s);
 }
 
 int __stdcall JErrorTextM(int idx, I ec, I* p)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jerrortextm(jt, ec, p);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jerrortextm(jt, ec, p);
 }
 
 int __stdcall JFree(int idx)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jfree(jt);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jfree(jt);
 }
 
 int  __stdcall JDoR(int idx, C* sentence, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jdor(jt, sentence, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jdor(jt, sentence, v);
 }
 
 int  __stdcall JGet(int idx, C* name, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jget(jt, name, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jget(jt, name, v);
 }
 
 int __stdcall JGetB(int idx, C* name, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jgetb(jt, name, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jgetb(jt, name, v);
 }
 
 int __stdcall JSet(int idx, C* name, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jset(jt, name, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jset(jt, name, v);
 }
 
 int __stdcall JSetB(int idx, C* name, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jsetb(jt, name, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jsetb(jt, name, v);
 }
 
 int __stdcall JErrorText(int idx, I ec, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jerrortext(jt, ec, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jerrortext(jt, ec, v);
 }
 
 int __stdcall JErrorTextB(int idx, I ec, VARIANT* v)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jerrortextb(jt, ec, v);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jerrortextb(jt, ec, v);
 }
 
 int __stdcall JTranspose(int idx, I b)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jtranspose(jt, b);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jtranspose(jt, b);
 }
 
 int __stdcall JBreak(int idx)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jbreak(jt);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jbreak(jt);
 }
 
 int __stdcall JClear(int idx)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jclear(jt);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jclear(jt);
 }
 
 int __stdcall JIsBusy(int idx)
 {
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return -1;
-	}
-	return jisbusy(jt);
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return -1;
+    }
+    return jisbusy(jt);
 }
 
 void* __stdcall JGetJt(int idx)
 {
-	return GetJt(idx);
+    return GetJt(idx);
 }
 
 C __stdcall JIncAdBreak(int idx) // Not sure what exactly this does
 {
-	char **adadbreak;
-	void* jt = GetJt(idx);
-	if (NULL == jt) {
-		return '\0';
-	}
-	adadbreak=(char**)jt; // first address in jt is address of breakdata;
-	**adadbreak += 1;
-	return **adadbreak;
+    char **adadbreak;
+    void* jt = GetJt(idx);
+    if (NULL == jt) {
+        return '\0';
+    }
+    adadbreak=(char**)jt; // first address in jt is address of breakdata;
+    **adadbreak += 1;
+    return **adadbreak;
 }
 
 static BOOL GetJProcAddresses(HMODULE hModule) {
-	CHAR* fsp;
-	CHAR fullPath[MAX_PATH];
+    CHAR* fsp;
+    CHAR fullPath[MAX_PATH];
 
-	GetModuleFileName(hModule, fullPath, MAX_PATH);
-	fsp = strrchr(fullPath, '\\') + 1;
-	strcpy_s(fsp, strlen(JDLLNAME) + 1, JDLLNAME);
-	hJdll = LoadLibrary(fullPath);
-	if (NULL == hJdll) {
-		printf("Load library %s failed. Error %d.\n", fullPath, GetLastError());
-		return FALSE;
-	}
-	if (FALSE == GetJProcAddress(&jinit, "JInit") ||
-		FALSE == GetJProcAddress(&jsm, "JSM") ||
-		FALSE == GetJProcAddress(&jdo, "JDo") ||
-		FALSE == GetJProcAddress(&jgetlocale, "JGetLocale") ||
-		FALSE == GetJProcAddress(&jgeta, "JGetA") ||
-		FALSE == GetJProcAddress(&jgetm, "JGetM") ||
-		FALSE == GetJProcAddress(&jseta, "JSetA") ||
-		FALSE == GetJProcAddress(&jsetm, "JSetM") ||
-		FALSE == GetJProcAddress(&jga, "Jga") ||
-		FALSE == GetJProcAddress(&jerrortextm, "JErrorTextM") ||
-		FALSE == GetJProcAddress(&jfree, "JFree") ||
-		FALSE == GetJProcAddress(&jdor, "JDoR") ||
-		FALSE == GetJProcAddress(&jget, "JGet") ||
-		FALSE == GetJProcAddress(&jgetb, "JGetB") ||
-		FALSE == GetJProcAddress(&jset, "JSet") ||
-		FALSE == GetJProcAddress(&jsetb, "JSetB") ||
-		FALSE == GetJProcAddress(&jerrortext, "JErrorText") ||
-		FALSE == GetJProcAddress(&jerrortextb, "JErrorTextB") ||
-		FALSE == GetJProcAddress(&jtranspose, "JTranspose") ||
-		FALSE == GetJProcAddress(&jbreak, "JBreak") ||
-		FALSE == GetJProcAddress(&jclear, "JClear") ||
-		FALSE == GetJProcAddress(&jisbusy, "JIsBusy")) {
-			return FALSE;
-	}
-	return TRUE;
+    GetModuleFileName(hModule, fullPath, MAX_PATH);
+    fsp = strrchr(fullPath, '\\') + 1;
+    strcpy_s(fsp, strlen(JDLLNAME) + 1, JDLLNAME);
+    hJdll = LoadLibrary(fullPath);
+    if (NULL == hJdll) {
+        printf("Load library %s failed. Error %d.\n", fullPath, GetLastError());
+        return FALSE;
+    }
+    if (FALSE == GetJProcAddress(&jinit, "JInit") ||
+        FALSE == GetJProcAddress(&jsm, "JSM") ||
+        FALSE == GetJProcAddress(&jdo, "JDo") ||
+        FALSE == GetJProcAddress(&jgetlocale, "JGetLocale") ||
+        FALSE == GetJProcAddress(&jgeta, "JGetA") ||
+        FALSE == GetJProcAddress(&jgetm, "JGetM") ||
+        FALSE == GetJProcAddress(&jseta, "JSetA") ||
+        FALSE == GetJProcAddress(&jsetm, "JSetM") ||
+        FALSE == GetJProcAddress(&jga, "Jga") ||
+        FALSE == GetJProcAddress(&jerrortextm, "JErrorTextM") ||
+        FALSE == GetJProcAddress(&jfree, "JFree") ||
+        FALSE == GetJProcAddress(&jdor, "JDoR") ||
+        FALSE == GetJProcAddress(&jget, "JGet") ||
+        FALSE == GetJProcAddress(&jgetb, "JGetB") ||
+        FALSE == GetJProcAddress(&jset, "JSet") ||
+        FALSE == GetJProcAddress(&jsetb, "JSetB") ||
+        FALSE == GetJProcAddress(&jerrortext, "JErrorText") ||
+        FALSE == GetJProcAddress(&jerrortextb, "JErrorTextB") ||
+        FALSE == GetJProcAddress(&jtranspose, "JTranspose") ||
+        FALSE == GetJProcAddress(&jbreak, "JBreak") ||
+        FALSE == GetJProcAddress(&jclear, "JClear") ||
+        FALSE == GetJProcAddress(&jisbusy, "JIsBusy")) {
+            return FALSE;
+    }
+    return TRUE;
 }
 
 static BOOL GetJProcAddress(void** func, char* name) {
-	if (!(*func = GetProcAddress(hJdll, name))) {
-		printf("Failed to get %s address. Error %d.\n", name, GetLastError());
-		return FALSE;
-	}
-	return TRUE;
+    if (!(*func = GetProcAddress(hJdll, name))) {
+        printf("Failed to get %s address. Error %d.\n", name, GetLastError());
+        return FALSE;
+    }
+    return TRUE;
 }
