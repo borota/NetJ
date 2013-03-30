@@ -3,7 +3,7 @@ NetJ
 
 .NET support for J engine via PInvoke
 
-J.sln       - Visual Studio 2010 solution
+J.sln       - Visual Studio 2010 solution   
 J.2012.sln  - Visual Studio 2012 solution
 
  * jsm - c code implementing j session management.
@@ -15,3 +15,5 @@ J.2012.sln  - Visual Studio 2012 solution
  * J.Console - .NET j consoles illustrating J.SessionManager.dll use.
 
 Select x86 Platform to compile for 32 bit or x64 for 64 bit.
+
+J can be downloaded from [Jsoftware](http://www.jsoftware.com/).
