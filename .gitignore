@@ -5,11 +5,11 @@
 *.pydevproject
 .project
 .metadata
-bin/*
-!bin/profile.ijs
-!bin/profilex_template.ijs
-!bin/j.dll
-!bin/j32.dll
+J.701/bin/*
+!J.701/bin/profile.ijs
+!J.701/bin/profilex_template.ijs
+!J.701/bin/j.dll
+!J.701/bin/j32.dll
 tmp/
 *.tmp
 *.bak
