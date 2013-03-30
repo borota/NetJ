@@ -1,4 +1,4 @@
-#include "../jsm/jsm.h"
+#include "jsm.h"
 #include <io.h>
 #include <signal.h>
 
@@ -7,7 +7,6 @@
 
 // smoptions
 #define SMCON    3  /* jconsole */
-#define ijx "11!:0'pc ijx closeok;xywh 0 0 300 200;cc e editijx rightmove bottommove ws_vscroll ws_hscroll;setfont e \"Courier New\" 12;setfocus e;pas 0 0;pgroup jijx;pshow;'[18!:4<'base'"
 
 void __stdcall Joutput(void*, int, char*);
 char* __stdcall Jinput(void*, char*);
@@ -91,7 +90,7 @@ static int jefirst(int type, char* arg)
     else if(1==type)
         strcat(input,"(3 : '0!:0 y')2{ARGV");
     else if(2==type)
-        strcat(input,ijx);
+        strcat(input,"11!:0'pc ijx closeok;xywh 0 0 300 200;cc e editijx rightmove bottommove ws_vscroll ws_hscroll;setfont e \"Courier New\" 12;setfocus e;pas 0 0;pgroup jijx;pshow;'[18!:4<'base'");
     else
         strcat(input,"i.0 0");
     strcat(input,"[ARGV_z_=:");

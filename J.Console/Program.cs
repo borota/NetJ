@@ -1,35 +1,36 @@
-﻿using Nj;
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
+using J.SessionManager;
 
-namespace NjConsole
+namespace J.Console
 {
     class Program
     {
-        static JSession jsm = null;
-        static string input = null;
+        private static JSession jSession = null;
+        private static string input = null;
 
-        static int Main(string[] args)
+        private static int Main(string[] args)
         {
             try
             {
-                using (jsm = new JSession())
+                using (jSession = new JSession())
                 {
-                    Console.CancelKeyPress += (sender, e) =>
+                    System.Console.CancelKeyPress += (sender, e) =>
                     {
                         e.Cancel = true;
-                        jsm.IncAdBreak();
+                        jSession.IncAdBreak();
                     };
-                    jsm.SetOutput((jt, tp, s) =>
+                    jSession.SetOutput((jt, tp, s) =>
                     {
                         if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
-                        Console.Out.Write(s); Console.Out.Flush();
+                        System.Console.Out.Write(s); System.Console.Out.Flush();
                     });
-                    jsm.SetInput((jt, prompt) => Jinput(jt, prompt));
-                    jsm.SetType(JSession.SMCON);
-                    jsm.ApplyCallbacks();
+                    jSession.SetInput((jt, prompt) => JInput(jt, prompt));
+                    jSession.SetType(JSession.SMCON);
+                    jSession.ApplyCallbacks();
                     int type;
                     if (args.Length == 1 && args[0] == "-jprofile")
                         type = 3;
@@ -37,43 +38,44 @@ namespace NjConsole
                         type = 1;
                     else
                         type = 0;
-                    addargv(args);
-                    jefirst(type);
+                    AddArgs(args);
+                    JeFirst(type);
                     while (true)
                     {
-                        jsm.Do(Jinput(IntPtr.Zero, "   "));
+                        jSession.Do(JInput(IntPtr.Zero, "   "));
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                Console.Write("Press any key to continue... ");
-                Console.ReadKey();
+                System.Console.WriteLine(ex.Message);
+                System.Console.Write("Press any key to continue... ");
+                System.Console.ReadKey();
                 return 1;
             }
         }
 
-        static string Jinput(IntPtr jt, string prompt)
+        private static string JInput(IntPtr jt, string prompt)
         {
-            Console.Out.Write(prompt); Console.Out.Flush();
-            var line = Console.In.ReadLine();
+            System.Console.Out.Write(prompt); System.Console.Out.Flush();
+            var line = System.Console.In.ReadLine();
             if (null == line)
             {
-                if (Console.IsInputRedirected)
+                if (IsConsoleInputRedirected())
                 {
                     return "2!:55''";
                 }
-                Console.Out.WriteLine(); Console.Out.Flush();
-                jsm.IncAdBreak();
+                System.Console.Out.WriteLine(); System.Console.Out.Flush();
+                jSession.IncAdBreak();
             }
-            else {
+            else
+            {
                 input = line;
             }
             return input;
         }
 
-        static void addargv(string[] args)
+        private static void AddArgs(string[] args)
         {
             var sb = new StringBuilder();
             if (0 == args.Length)
@@ -92,7 +94,7 @@ namespace NjConsole
             input = sb.ToString();
         }
 
-        static int jefirst(int type)
+        private static int JeFirst(int type)
         {
             var init = new StringBuilder();
             if (0 == type)
@@ -110,7 +112,26 @@ namespace NjConsole
             init.Append("[BINPATH_z_=:'");
             init.Append(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).Replace('\\', '/'));
             init.Append('\'');
-            return jsm.Do(init.ToString());
+            return jSession.Do(init.ToString());
         }
+
+        private static bool IsConsoleInputRedirected()
+        {
+#if NET40
+            return FileType.Char != GetFileType(GetStdHandle(StdHandle.Stdin));
+#else
+            return System.Console.IsInputRedirected;
+#endif
+        }
+
+#if NET40
+        // P/Invoke:
+        private enum FileType { Unknown, Disk, Char, Pipe };
+        private enum StdHandle { Stdin = -10, Stdout = -11, Stderr = -12 };
+        [DllImport("kernel32.dll")]
+        private static extern FileType GetFileType(IntPtr hdl);
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetStdHandle(StdHandle std);
+#endif
     }
 }

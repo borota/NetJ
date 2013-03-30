@@ -20,12 +20,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="jsm.def">
-      <Filter>Source Files</Filter>
-    </None>
+    <ResourceCompile Include="jsmtest.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="jsm.c">
+    <ClCompile Include="main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

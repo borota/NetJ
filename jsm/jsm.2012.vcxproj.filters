@@ -15,9 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="jsm.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClCompile Include="jsm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="jsm.def">
@@ -25,8 +25,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="jsm.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClInclude Include="jsm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

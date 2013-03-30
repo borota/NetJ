@@ -1,6 +1,6 @@
 
 Current code is licensed under GPL3. Please contact JSOFTWARE if you
-want to use it commercially. Contact info: http://www.jsoftware.com/
+need a closed code license. Contact info: http://www.jsoftware.com/
 
 See gpl3.txt for GNU General Public License version 3.
 Additional info at http://www.gnu.org/licenses.

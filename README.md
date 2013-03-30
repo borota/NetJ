@@ -3,14 +3,15 @@ NetJ
 
 .NET support for J engine via PInvoke
 
-Visual Studio 2012 Solution. It works with the free Express for Windows Desktop as well.
+J.sln       - Visual Studio 2010 solution
+J.2012.sln  - Visual Studio 2012 solution
 
  * jsm - c code implementing j session management.
 
  * jsmtest - c code used to debug/test jsm.dll
 
- * nj - .NET C# PInvoke based wrapper around jsm.dll.
+ * J.SessionManager - .NET C# PInvoke based wrapper around jsm.dll.
 
- * nconsole - .NET j consoles illustrating nj.dll use.
+ * J.Console - .NET j consoles illustrating J.SessionManager.dll use.
 
-Select Win32 Platform to compile for 32 bit or x64 for 64 bit. 
+Select x86 Platform to compile for 32 bit or x64 for 64 bit.

@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Nj
+namespace J.SessionManager
 {
     public class JSession : IDisposable
     {
@@ -13,15 +13,15 @@ namespace Nj
         private bool _disposed;
 
         // smoptions
-        public const int SMWIN  = 0;  /* j.exe    Jwdw (Windows) front end */
+        public const int SMWIN = 0;  /* j.exe    Jwdw (Windows) front end */
         public const int SMJAVA = 2;  /* j.jar    Jwdp (Java) front end */
-        public const int SMCON  = 3;  /* jconsole */
+        public const int SMCON = 3;  /* jconsole */
 
         // output type
-        public const int MTYOFM   = 1;	/* formatted result array output */
-        public const int MTYOER   = 2;	/* error output */
-        public const int MTYOLOG  = 3;	/* output log */
-        public const int MTYOSYS  = 4;	/* system assertion failure */
+        public const int MTYOFM = 1;	/* formatted result array output */
+        public const int MTYOER = 2;	/* error output */
+        public const int MTYOLOG = 3;	/* output log */
+        public const int MTYOSYS = 4;	/* system assertion failure */
         public const int MTYOEXIT = 5;	/* exit */
         public const int MTYOFILE = 6;	/* output 1!:2[2 */
 

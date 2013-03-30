@@ -8,6 +8,8 @@
 bin/*
 !bin/profile.ijs
 !bin/profilex_template.ijs
+!bin/j.dll
+!bin/j32.dll
 tmp/
 *.tmp
 *.bak
