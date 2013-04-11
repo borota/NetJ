@@ -1,11 +1,7 @@
 #include "jsm.h"
 
 #define MEMCHUNCK 1024
-#ifdef _WIN64
 #define JDLLNAME "j.dll"
-#else
-#define JDLLNAME "j32.dll"
-#endif
 
 BOOL GetJProcAddresses(HMODULE);
 BOOL GetJProcAddress(void*, char*);
@@ -362,12 +358,20 @@ C __stdcall JIncAdBreak(int idx) // Not sure what exactly this does
 static BOOL GetJProcAddresses(HMODULE hModule) {
     CHAR* fsp;
     CHAR fullPath[MAX_PATH];
+    int len;
 
     GetModuleFileName(hModule, fullPath, MAX_PATH);
     fsp = strrchr(fullPath, '\\') + 1;
     strcpy_s(fsp, strlen(JDLLNAME) + 1, JDLLNAME);
-    hJdll = LoadLibrary(fullPath);
+    hJdll = LoadLibrary(fullPath); // from jsm.dll directory
     if (NULL == hJdll) {
+        if (0 < (len = GetEnvironmentVariable("JPATH", fullPath, MAX_PATH)) && len < MAX_PATH)
+        {
+            hJdll = LoadLibrary(fullPath); // from JPATH environment variable
+        }
+    }
+    if (NULL == hJdll) 
+    {
         printf("Load library %s failed. Error %d.\n", fullPath, GetLastError());
         return FALSE;
     }

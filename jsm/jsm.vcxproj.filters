@@ -23,6 +23,8 @@
     <None Include="jsm.def">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="j64.dll" />
+    <None Include="j32.dll" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="jsm.c">

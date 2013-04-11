@@ -94,6 +94,14 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>$(ProjectDir)jsm.def</ModuleDefinitionFile>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST $(OutDir)j.dll DEL /F $(OutDir)j.dll
+IF '$(Platform)'=='Win32' COPY $(ProjectDir)j32.dll $(OutDir)j.dll
+IF '$(Platform)'=='x64' COPY $(ProjectDir)j64.dll $(OutDir)j.dll</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Fix j.dll name</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -109,6 +117,14 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>$(ProjectDir)jsm.def</ModuleDefinitionFile>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST $(OutDir)j.dll DEL /F $(OutDir)j.dll
+IF '$(Platform)'=='Win32' COPY $(ProjectDir)j32.dll $(OutDir)j.dll
+IF '$(Platform)'=='x64' COPY $(ProjectDir)j64.dll $(OutDir)j.dll</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Fix j.dll name</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -128,6 +144,14 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>$(ProjectDir)jsm.def</ModuleDefinitionFile>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST $(OutDir)j.dll DEL /F $(OutDir)j.dll
+IF '$(Platform)'=='Win32' COPY $(ProjectDir)j32.dll $(OutDir)j.dll
+IF '$(Platform)'=='x64' COPY $(ProjectDir)j64.dll $(OutDir)j.dll</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Fix j.dll name</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -147,11 +171,21 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>$(ProjectDir)jsm.def</ModuleDefinitionFile>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST $(OutDir)j.dll DEL /F $(OutDir)j.dll
+IF '$(Platform)'=='Win32' COPY $(ProjectDir)j32.dll $(OutDir)j.dll
+IF '$(Platform)'=='x64' COPY $(ProjectDir)j64.dll $(OutDir)j.dll</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Fix j.dll name</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="jsm.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="j64.dll" />
+    <None Include="j32.dll" />
     <None Include="jsm.def" />
   </ItemGroup>
   <ItemGroup>
