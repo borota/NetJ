@@ -1,36 +1,73 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using J.SessionManager;
+using NDesk.Options;
 
 namespace J.Console
 {
     class Program
     {
-        private static JSession jSession = null;
-        private static string input = null;
+        private static JSession _jSession = null;
+        private static string _input = null;
+        private static string _programName;
+        private static Options _options;
 
-        private static int Main(string[] args)
+        private static int Main(string[] argv)
         {
             try
             {
-                using (jSession = new JSession())
+                _programName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+                _options = new Options();
+
+                bool showHelp = false;
+                var optionSet = new OptionSet()
+                {
+                    { "p|port=", "{PORT} on which J server listens.", (ushort v) => _options.Ports.Add(v) },
+					{ "n|non-interactive", "Start non-interactive server session.", v => _options.NonInteractive = v != null },
+                    { "h|help",  "Show this message and exit.", v => showHelp = v != null }
+                };
+
+                string[] args = null;
+                try
+                {
+                    args = optionSet.Parse(argv).ToArray();
+                    if (showHelp)
+                    {
+                        ShowHelp(optionSet);
+                        return 0;
+                    }
+                    if (_options.NonInteractive && _options.Ports.Count < 1)
+                    {
+                        throw new Exception("Missing port for non-interactive server session.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    System.Console.WriteLine();
+                    System.Console.Write(string.Format("{0}: ", _programName));
+                    System.Console.WriteLine(e.Message);
+                    System.Console.WriteLine(string.Format("Try '{0} --help' for more information.", _programName));
+                    return 1;
+                }
+                using (_jSession = new JSession())
                 {
                     System.Console.CancelKeyPress += (sender, e) =>
                     {
                         e.Cancel = true;
-                        jSession.IncAdBreak();
+                        _jSession.IncAdBreak();
                     };
-                    jSession.SetOutput((jt, tp, s) =>
+                    _jSession.SetOutput((jt, tp, s) =>
                     {
                         if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
                         System.Console.Out.Write(s); System.Console.Out.Flush();
                     });
-                    jSession.SetInput((jt, prompt) => JInput(jt, prompt));
-                    jSession.SetType(JSession.SMCON);
-                    jSession.ApplyCallbacks();
+                    _jSession.SetInput((jt, prompt) => JInput(jt, prompt));
+                    _jSession.SetType(JSession.SMCON);
+                    _jSession.ApplyCallbacks();
                     int type;
                     if (args.Length == 1 && args[0] == "-jprofile")
                         type = 3;
@@ -42,7 +79,7 @@ namespace J.Console
                     JeFirst(type);
                     while (true)
                     {
-                        jSession.Do(JInput(IntPtr.Zero, "   "));
+                        _jSession.Do(JInput(IntPtr.Zero, "   "));
                     }
                 }
             }
@@ -66,13 +103,13 @@ namespace J.Console
                     return "2!:55''";
                 }
                 System.Console.Out.WriteLine(); System.Console.Out.Flush();
-                jSession.IncAdBreak();
+                _jSession.IncAdBreak();
             }
             else
             {
-                input = line;
+                _input = line;
             }
-            return input;
+            return _input;
         }
 
         private static void AddArgs(string[] args)
@@ -91,7 +128,7 @@ namespace J.Console
                 sb.Append(arg.Replace("'", "''"));
                 sb.Append('\'');
             }
-            input = sb.ToString();
+            _input = sb.ToString();
         }
 
         private static int JeFirst(int type)
@@ -108,11 +145,16 @@ namespace J.Console
             else
                 init.Append("i.0 0");
             init.Append("[ARGV_z_=:");
-            init.Append(input);
+            init.Append(_input);
             init.Append("[BINPATH_z_=:'");
-            init.Append(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location).Replace('\\', '/'));
+            string binPath = null;
+            if (null == (binPath = Environment.GetEnvironmentVariable("JPATH")))
+            {
+                binPath = Assembly.GetExecutingAssembly().Location;
+            }
+            init.Append(Path.GetDirectoryName(binPath).Replace('\\', '/'));
             init.Append('\'');
-            return jSession.Do(init.ToString());
+            return _jSession.Do(init.ToString());
         }
 
         private static bool IsConsoleInputRedirected()
@@ -133,5 +175,22 @@ namespace J.Console
         [DllImport("kernel32.dll")]
         private static extern IntPtr GetStdHandle(StdHandle std);
 #endif
+
+        private static void ShowHelp(OptionSet optionSet)
+        {
+            System.Console.WriteLine(string.Format("Usage: {0} [OPTIONS]", _programName));
+            System.Console.WriteLine(".NET based console for J language engine.");
+            System.Console.WriteLine();
+            System.Console.WriteLine("Options:");
+            optionSet.WriteOptionDescriptions(System.Console.Out);
+            System.Console.WriteLine();
+            System.Console.WriteLine("Usual jconsole options (-jprofile, -js, etc.) are supported too.");
+        }
+
+        private class Options
+        {
+            internal readonly List<ushort> Ports = new List<ushort>();
+            internal bool NonInteractive = false;
+        }
     }
 }

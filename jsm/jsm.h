@@ -6,6 +6,7 @@
 typedef long               I;
 typedef char               C;
 typedef struct {I k,flag,m,t,c,n,r,s[1];}* A;
+typedef void  *JtsCallback (void** jts, int jtSz, int jtIdx);
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,6 +34,7 @@ extern "C" {
     int  __stdcall JClear(int);
     int  __stdcall JIsBusy(int);
     void*__stdcall JGetJt(int);
+    void __stdcall JProcessJts(JtsCallback);
     C    __stdcall JIncAdBreak(int);
 #ifdef __cplusplus
 }

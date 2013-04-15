@@ -5,10 +5,14 @@
 
 BOOL GetJProcAddresses(HMODULE);
 BOOL GetJProcAddress(void*, char*);
+void ReleaseMyMutex();
 
+// Critical memory - start
 static void** jts = NULL;
 static int    jtSz = 0;
 static int    jtIdx = -1;
+// Critical memory - end
+
 static HANDLE jtMutex = NULL;
 static HMODULE hJdll = NULL;
 
@@ -96,61 +100,91 @@ static JIsBusyType     jisbusy;
 
 int __stdcall JInit()
 {
-    DWORD dwWaitResult;
     void** njts = NULL;
-
-    dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
+    DWORD dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
     switch (dwWaitResult)
     {
-    case WAIT_OBJECT_0:
-        __try {
-            if (++jtIdx >= jtSz) {
-                njts = (void**)calloc(jtSz + MEMCHUNCK, sizeof(void*));
-                if (NULL != njts) {
-                    if (NULL != jts) {
-                        memcpy(njts, jts, jtSz * sizeof(void*));
-                        free(jts);
+        case WAIT_OBJECT_0:
+            __try {
+                if (++jtIdx >= jtSz) {
+                    njts = (void**)calloc(jtSz + MEMCHUNCK, sizeof(void*));
+                    if (NULL != njts) {
+                        if (NULL != jts) {
+                            memcpy(njts, jts, jtSz * sizeof(void*));
+                            free(jts);
+                        }
+                        jts = njts;
+                        jtSz += MEMCHUNCK;
+                        jts[jtIdx] = jinit();
                     }
-                    jts = njts;
-                    jtSz += MEMCHUNCK;
-                    jts[jtIdx] = jinit();
+                    else {
+                        printf("calloc error: %d\n", errno);
+                        return -1;
+                    }
                 }
                 else {
-                    printf("calloc error: %d\n", errno);
-                    return -1;
+                    jts[jtIdx] = jinit();
                 }
-            } 
-            else {
-                jts[jtIdx] = jinit();
+                return jtIdx;
             }
-        }
-        __finally {
-            if (!ReleaseMutex(jtMutex))
-            {
-                printf("Failed to release mutex. Error %d\n", GetLastError());
+            __finally {
+                ReleaseMyMutex();
             }
-        }
-        break;
-    case WAIT_ABANDONED:
-        printf("Warning: abandoned mutex. Error %d\n", GetLastError());
-        return -3;
+            break;
+        case WAIT_ABANDONED:
+            printf("Warning: abandoned mutex. Error %d\n", GetLastError());
+        default:
+            return -1;
     }
-    return jtIdx;
 }
 
-void* GetJt(int idx) 
+void* __stdcall JGetJt(int idx) 
 {
-    void* jt = NULL;
-    if (!(idx >= 0 && idx <= jtIdx)) {
-        printf("Invalid session id %d passed.\n", idx);
-        return NULL;
+    DWORD dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
+    switch (dwWaitResult)
+    {
+        case WAIT_OBJECT_0:
+            __try {
+                if (!(idx >= 0 && idx <= jtIdx)) {
+                    printf("Invalid session id %d passed.\n", idx);
+                    return NULL;
+                }
+                return jts[idx];
+            }
+            __finally {
+                ReleaseMyMutex();
+            }
+            break;
+        case WAIT_ABANDONED:
+            printf("Warning: abandoned mutex. Error %d\n", GetLastError());
+        default:
+            return NULL;
     }
-    return jts[idx];
+}
+
+void __stdcall JProcessJts(JtsCallback func)
+{
+    DWORD dwWaitResult = WaitForSingleObject(jtMutex, INFINITE);
+    switch (dwWaitResult)
+    {
+        case WAIT_OBJECT_0:
+            __try {
+                func(jts, jtSz, jtIdx);
+            }
+            __finally {
+                ReleaseMyMutex();
+            }
+            break;
+        case WAIT_ABANDONED:
+            printf("Warning: abandoned mutex. Error %d\n", GetLastError());
+        default:
+            break;
+    }
 }
 
 int __stdcall JSM(int idx, void* callbacks[])
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -160,7 +194,7 @@ int __stdcall JSM(int idx, void* callbacks[])
 
 int  __stdcall JDo(int idx, C* sentence)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -169,7 +203,7 @@ int  __stdcall JDo(int idx, C* sentence)
 
 C* __stdcall JGetLocale(int idx)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return NULL;
     }
@@ -178,7 +212,7 @@ C* __stdcall JGetLocale(int idx)
 
 A __stdcall JGetA(int idx, I n, C* name)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return NULL;
     }
@@ -187,7 +221,7 @@ A __stdcall JGetA(int idx, I n, C* name)
 
 int __stdcall JGetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata) 
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -196,7 +230,7 @@ int __stdcall JGetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata)
 
 I __stdcall JSetA(int idx, I n, C* name, I dlen, C* d)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -205,7 +239,7 @@ I __stdcall JSetA(int idx, I n, C* name, I dlen, C* d)
 
 int __stdcall JSetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -214,7 +248,7 @@ int __stdcall JSetM(int idx, C* name, I* jtype, I* jrank, I* jshape, I* jdata)
 
 A __stdcall Jga(int idx, I t, I n, I r, I*s)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return NULL;
     }
@@ -223,7 +257,7 @@ A __stdcall Jga(int idx, I t, I n, I r, I*s)
 
 int __stdcall JErrorTextM(int idx, I ec, I* p)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -232,7 +266,7 @@ int __stdcall JErrorTextM(int idx, I ec, I* p)
 
 int __stdcall JFree(int idx)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -241,7 +275,7 @@ int __stdcall JFree(int idx)
 
 int  __stdcall JDoR(int idx, C* sentence, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -250,7 +284,7 @@ int  __stdcall JDoR(int idx, C* sentence, VARIANT* v)
 
 int  __stdcall JGet(int idx, C* name, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -259,7 +293,7 @@ int  __stdcall JGet(int idx, C* name, VARIANT* v)
 
 int __stdcall JGetB(int idx, C* name, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -268,7 +302,7 @@ int __stdcall JGetB(int idx, C* name, VARIANT* v)
 
 int __stdcall JSet(int idx, C* name, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -277,7 +311,7 @@ int __stdcall JSet(int idx, C* name, VARIANT* v)
 
 int __stdcall JSetB(int idx, C* name, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -286,7 +320,7 @@ int __stdcall JSetB(int idx, C* name, VARIANT* v)
 
 int __stdcall JErrorText(int idx, I ec, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -295,7 +329,7 @@ int __stdcall JErrorText(int idx, I ec, VARIANT* v)
 
 int __stdcall JErrorTextB(int idx, I ec, VARIANT* v)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -304,7 +338,7 @@ int __stdcall JErrorTextB(int idx, I ec, VARIANT* v)
 
 int __stdcall JTranspose(int idx, I b)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -313,7 +347,7 @@ int __stdcall JTranspose(int idx, I b)
 
 int __stdcall JBreak(int idx)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -322,7 +356,7 @@ int __stdcall JBreak(int idx)
 
 int __stdcall JClear(int idx)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
@@ -331,22 +365,17 @@ int __stdcall JClear(int idx)
 
 int __stdcall JIsBusy(int idx)
 {
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return -1;
     }
     return jisbusy(jt);
 }
 
-void* __stdcall JGetJt(int idx)
-{
-    return GetJt(idx);
-}
-
 C __stdcall JIncAdBreak(int idx) // Not sure what exactly this does
 {
     char **adadbreak;
-    void* jt = GetJt(idx);
+    void* jt = JGetJt(idx);
     if (NULL == jt) {
         return '\0';
     }
@@ -408,4 +437,12 @@ static BOOL GetJProcAddress(void** func, char* name) {
         return FALSE;
     }
     return TRUE;
+}
+
+static void ReleaseMyMutex()
+{
+    if (!ReleaseMutex(jtMutex))
+    {
+        printf("Failed to release mutex. Error %d\n", GetLastError());
+    }
 }

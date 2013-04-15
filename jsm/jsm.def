@@ -24,4 +24,5 @@ EXPORTS
     JClear         @21
     JIsBusy        @22
     JGetJt         @23
-    JIncAdBreak    @24
+	JProcessJts    @24
+    JIncAdBreak    @25
