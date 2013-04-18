@@ -14,35 +14,44 @@ namespace J.Console
         private static JSession _jSession = null;
         private static string _input = null;
         private static string _programName;
-        private static Options _options;
+        private static CmdLineOptions _options;
 
-        private static int Main(string[] argv)
+            private static int Main(string[] argv)
         {
             try
             {
                 _programName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
-                _options = new Options();
+                _options = new CmdLineOptions();
 
                 bool showHelp = false;
                 var optionSet = new OptionSet()
                 {
-                    { "p|port=", "{PORT} on which J server listens.", (ushort v) => _options.Ports.Add(v) },
-					{ "n|non-interactive", "Start non-interactive server session.", v => _options.NonInteractive = v != null },
+                    { "p|port=", "{PORT} to listen/connect to.", (ushort v) => _options.Ports.Add(v) },
+					{ "i|interactive", "Start interactive session. Use -i- to turn off.", v => _options.Interactive = v != null },
+                    { "l|loopback", "Listen on loopback. Use -l- to use network.\n", v => _options.Loopback = v != null },
+                    { "r|repl", "Start as repl client. Following options apply.", v => { _options.ReplMode = v != null;  _options.Interactive = false; } },
+                    { "f|launch_file", "The script file to run on startup.", v => { _options.LaunchFile = v; _options.ReplMode = true; _options.Interactive = false; } },
+                    { "m|execution_mode", "The backend to use.", v => { _options.Backend = v; _options.ReplMode = true; _options.Interactive = false; } },
+                    { "a|enable-attach", "Enable attaching the debugger via )attach.", v => { _options.EnableAttach = v != null; _options.ReplMode = true; _options.Interactive = false; } },
+                    { "s|server=", "Repl {SERVER} to connect to. Default is 127.0.0.1.\n", v => { _options.Server = v; _options.ReplMode = true; _options.Interactive = false; } },
                     { "h|help",  "Show this message and exit.", v => showHelp = v != null }
                 };
 
-                string[] args = null;
                 try
                 {
-                    args = optionSet.Parse(argv).ToArray();
+                    _options.JOptions = optionSet.Parse(argv).ToArray();
                     if (showHelp)
                     {
                         ShowHelp(optionSet);
                         return 0;
                     }
-                    if (_options.NonInteractive && _options.Ports.Count < 1)
+                    if (!_options.Interactive && _options.Ports.Count < 1)
                     {
-                        throw new Exception("Missing port for non-interactive server session.");
+                        throw new Exception(string.Format("Missing PORT for {0} session.", (_options.ReplMode ? "repl processor" : "non-interactive server")));
+                    }
+                    if (_options.ReplMode && _options.Ports.Count < 1)
+                    {
+                        throw new Exception("Missing PORT for client mode session.");
                     }
                 }
                 catch (Exception e)
@@ -60,27 +69,51 @@ namespace J.Console
                         e.Cancel = true;
                         _jSession.IncAdBreak();
                     };
-                    _jSession.SetOutput((jt, tp, s) =>
+                    if (_options.Interactive)
                     {
-                        if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
-                        System.Console.Out.Write(s); System.Console.Out.Flush();
-                    });
-                    _jSession.SetInput((jt, prompt) => JInput(jt, prompt));
-                    _jSession.SetType(JSession.SMCON);
-                    _jSession.ApplyCallbacks();
+                        _jSession.SetOutput((jt, tp, s) =>
+                        {
+                            if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
+                            System.Console.Out.Write(s); System.Console.Out.Flush();
+                        });
+                        _jSession.SetInput((jt, prompt) => JInput(jt, prompt));
+                        _jSession.SetType(JSession.SMCON);
+
+                        _jSession.ApplyCallbacks();
+                    }
                     int type;
-                    if (args.Length == 1 && args[0] == "-jprofile")
+                    if (_options.JOptions.Length == 1 && _options.JOptions[0] == "-jprofile")
                         type = 3;
-                    else if (args.Length > 1 && args[0] == "-jprofile")
+                    else if (_options.JOptions.Length > 1 && _options.JOptions[0] == "-jprofile")
                         type = 1;
                     else
                         type = 0;
-                    AddArgs(args);
+                    AddArgs();
                     JeFirst(type);
-                    while (true)
+                    if (0 < _options.Ports.Count)
+                    {
+                        var threadCount = _options.Interactive ? _options.Ports.Count : _options.Ports.Count - 1;
+                        for (int i = 0; i < threadCount; i++)
+                        {
+                            // create listening threads.
+                        }
+                        if (!_options.Interactive) // use main thread
+                        {
+                            if (_options.ReplMode)
+                            {
+                                ClientProc(_options.Ports[threadCount]);
+                            }
+                            else
+                            {
+                                ServerProc(_options.Ports[threadCount]);
+                            }
+                        }
+                    }
+                    while (_options.Interactive)
                     {
                         _jSession.Do(JInput(IntPtr.Zero, "   "));
                     }
+                    return 0;
                 }
             }
             catch (Exception ex)
@@ -112,17 +145,17 @@ namespace J.Console
             return _input;
         }
 
-        private static void AddArgs(string[] args)
+        private static void AddArgs()
         {
             var sb = new StringBuilder();
-            if (0 == args.Length)
+            if (0 == _options.JOptions.Length)
             {
                 sb.Append(",<");
             }
             sb.Append('\'');
             sb.Append(Assembly.GetExecutingAssembly().Location.Replace('\\', '/'));
             sb.Append('\'');
-            foreach (var arg in args)
+            foreach (var arg in _options.JOptions)
             {
                 sb.Append(";'");
                 sb.Append(arg.Replace("'", "''"));
@@ -184,13 +217,30 @@ namespace J.Console
             System.Console.WriteLine("Options:");
             optionSet.WriteOptionDescriptions(System.Console.Out);
             System.Console.WriteLine();
-            System.Console.WriteLine("Usual jconsole options (-jprofile, -js, etc.) are supported too.");
+            System.Console.WriteLine("Usual jconsole options (-jprofile, -js, etc.) are supported unchanged.");
         }
 
-        private class Options
+        private static void ClientProc(ushort port)
         {
-            internal readonly List<ushort> Ports = new List<ushort>();
-            internal bool NonInteractive = false;
         }
+
+        private static void ServerProc(ushort port)
+        {
+        }
+    }
+
+    internal class CmdLineOptions
+    {
+        internal readonly List<ushort> Ports = new List<ushort>();
+        internal bool Interactive = true;
+        internal bool Loopback = true;
+
+        internal bool ReplMode = false;
+        internal string LaunchFile = string.Empty;
+        internal string Backend = "standard";
+        internal bool EnableAttach = false;
+        internal string Server = "127.0.0.1";
+
+        internal string[] JOptions = null;
     }
 }

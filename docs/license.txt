@@ -4,3 +4,7 @@ need a closed code license. Contact info: http://www.jsoftware.com/
 
 See gpl3.txt for GNU General Public License version 3.
 Additional info at http://www.gnu.org/licenses.
+
+Some of the code re-used is from PTVS: http://pytools.codeplex.com/
+licensed by Microsoft under Apache 2.0 license. See respective
+comments inside the source files.
