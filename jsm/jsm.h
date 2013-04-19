@@ -3,7 +3,12 @@
 #include <windows.h>
 #include <stdio.h>
 
+ #if defined(_WIN64)
+typedef long long          I;
+#else
 typedef long               I;
+#endif
+typedef char               C;
 typedef char               C;
 typedef struct {I k,flag,m,t,c,n,r,s[1];}* A;
 typedef void  *JtsCallback (void** jts, int jtSz, int jtIdx);
