@@ -62,8 +62,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions.cs" />
+    <Compile Include="Options.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ReplProcessor.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\J.SessionManager\J.SessionManager.2012.csproj">
