@@ -3,11 +3,13 @@
  */
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
+using J.SessionManager;
 
 namespace J.Console
 {
@@ -18,7 +20,7 @@ namespace J.Console
         private CmdLineOptions _cmdLineOptions;
         private Thread _replThread;
 
-        public ReplProcessor(CmdLineOptions cmdLineOptions)
+        private ReplProcessor(CmdLineOptions cmdLineOptions)
         {
             this._cmdLineOptions = cmdLineOptions;
             this._replThread = null;
@@ -55,11 +57,12 @@ namespace J.Console
 
         public class UnsupportedReplException : Exception
         {
-            private string _Reason;
             UnsupportedReplException(string reason)
             {
-                this._Reason = reason;
+                this.Reason = reason;
             }
+
+            public string Reason { get; private set; }
         }
 
         /// <summary>
@@ -69,19 +72,19 @@ namespace J.Console
         /// </summary>
         public class ReplBackend
         {
-            private static readonly byte[] _MRES;
-            private static readonly byte[] _SRES;
-            private static readonly byte[] _MODS;
-            private static readonly byte[] _IMGD;
-            private static readonly byte[] _PRPC;
-            private static readonly byte[] _RDLN;
-            private static readonly byte[] _STDO;
-            private static readonly byte[] _STDE;
-            private static readonly byte[] _DBGA;
-            private static readonly byte[] _DETC;
-            private static readonly byte[] _DPNG;
-            private static readonly byte[] _UNICODE_PREFIX;
-            private static readonly byte[] _ASCII_PREFIX;
+            protected static readonly byte[] _MRES;
+            protected static readonly byte[] _SRES;
+            protected static readonly byte[] _MODS;
+            protected static readonly byte[] _IMGD;
+            protected static readonly byte[] _PRPC;
+            protected static readonly byte[] _RDLN;
+            protected static readonly byte[] _STDO;
+            protected static readonly byte[] _STDE;
+            protected static readonly byte[] _DBGA;
+            protected static readonly byte[] _DETC;
+            protected static readonly byte[] _DPNG;
+            protected static readonly byte[] _UNICODE_PREFIX;
+            protected static readonly byte[] _ASCII_PREFIX;
 
             static ReplBackend()
             {
@@ -100,12 +103,13 @@ namespace J.Console
                 _ASCII_PREFIX = ReplProcessor.Cmd("A");
             }
 
-            private readonly ReplProcessor _replProc;
+            protected readonly ReplProcessor _replProc;
             private TcpClient _conn;
             /// <summary>
             /// TODO: Make sure stream is closed.
             /// </summary>
-            private NetworkStream _stream;
+            protected NetworkStream _stream;
+            protected JSession _jSession;
             private string _inputString;
             private bool _exitRequested;
             private readonly Dictionary<string, Action> _COMMANDS;
@@ -139,7 +143,7 @@ namespace J.Console
                 this._exitRequested = false;
             }
 
-            public void Connect()
+            internal void Connect()
             {
                 this._conn = new TcpClient(this._replProc._cmdLineOptions.Server, this._replProc._cmdLineOptions.Ports[0]);
                 this._stream = this._conn.GetStream();
@@ -149,7 +153,7 @@ namespace J.Console
             /// <summary>
             /// TODO: revisit this method to see if you have to close previous stream, etc.
             /// </summary>
-            public void Connect(TcpClient socket)
+            protected void Connect(TcpClient socket)
             {
                 this._conn = socket;
                 this._stream = this._conn.GetStream();
@@ -397,7 +401,7 @@ namespace J.Console
             /// <summary>
             /// starts processing execution requests
             /// </summary>
-            protected virtual void ExecutionLoop()
+            internal virtual void ExecutionLoop()
             {
                 throw new NotImplementedException();
             }
@@ -500,7 +504,7 @@ namespace J.Console
                 }
             }
 
-            private void WriteString(string str)
+            protected void WriteString(string str)
             {
                 if (ReplProcessor.IsUnicode())
                 {
@@ -521,7 +525,7 @@ namespace J.Console
             /// executing text, etc...) won't become interleaved with interactions from the repl process 
             /// (output, execution completing, etc...).
             /// </summary>
-            struct SocketLock : IDisposable
+            protected struct SocketLock : IDisposable
             {
                 private readonly ReplBackend _evaluator;
 
@@ -549,7 +553,7 @@ namespace J.Console
             /// calling back into the repl window which could potentially call back to do
             /// work w/ the evaluator that we don't want to deadlock.
             /// </summary>
-            struct SocketUnlock : IDisposable
+            protected struct SocketUnlock : IDisposable
             {
                 private readonly ReplBackend _evaluator;
 
@@ -611,20 +615,112 @@ namespace J.Console
             }
         }
 
-        private void RunRepl()
+        class BasicReplBackend : ReplBackend
         {
+            internal BasicReplBackend(ReplProcessor replProcessor)
+                : base(replProcessor)
+            {
+            }
 
+            /// <summary>
+            /// loop on the main thread which is responsible for executing code
+            /// </summary>
+            internal override void ExecutionLoop()
+            {
+                this.SendPrompt("    ", "");
+                using (_jSession = new JSession())
+                {
+                    if (null != this._replProc._cmdLineOptions.LaunchFile)
+                    {
+                        try
+                        {
+                            runFileAsBase();
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine("error in launching startup script:");
+                            System.Console.WriteLine(ex.ToString());
+                        }
+                    }
+                    while (true)
+                    {
+                    }
+                }
+            }
+
+            /// <summary>
+            /// sends the current prompt to the interactive window
+            /// </summary>
+            internal void SendPrompt(string ps1, string ps2, bool updateAll = true)
+            {
+                using (new SocketLock())
+                {
+                    this._stream.Write(ReplBackend._PRPC);
+                    this.WriteString(ps1);
+                    this.WriteString(ps2);
+                    this._stream.WriteInt64(updateAll ? 1 : 0);
+                }
+            }
+
+            private void runFileAsBase()
+            {
+                string fileContent = System.IO.File.ReadAllText(this._replProc._cmdLineOptions.LaunchFile).Replace("\r\n", "\n");
+                _jSession.Do(fileContent);
+            }
+
+            internal void InitDebugger()
+            {
+            }
         }
 
-        public void Run()
+        private void RunRepl()
+        {
+            BasicReplBackend backendType = null;
+            string backendError = null;
+            if (null != this._cmdLineOptions.Backend && !this._cmdLineOptions.Backend.Equals("standard", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    backendType = (BasicReplBackend)Activator.CreateInstance(Type.GetType(this._cmdLineOptions.Backend), this);
+                }
+                catch (UnsupportedReplException ex)
+                {
+                    backendError = ex.Reason;
+                }
+                catch (Exception ex)
+                {
+                    backendError = ex.ToString();
+                }
+            }
+            if (null == backendType)
+            {
+                backendType = new BasicReplBackend(this);
+            }
+            backendType.Connect();
+            if (this._cmdLineOptions.EnableAttach)
+            {
+                backendType.InitDebugger();
+            }
+
+            if (null != backendError)
+            {
+                System.Console.Error.WriteLine("Error using selected REPL back-end:");
+                System.Console.Error.WriteLine(backendError);
+                System.Console.Error.WriteLine("Using standard backend instead.");
+            }
+            backendType.ExecutionLoop();
+        }
+
+        internal static void Run(CmdLineOptions cmdLineOptions)
         {
             try
             {
-                this.RunRepl();
+                var proc = new ReplProcessor(cmdLineOptions);
+                proc.RunRepl();
             }
             catch (Exception ex)
             {
-                if (_isDebug)
+                if (ReplProcessor._isDebug)
                 {
                     System.Console.WriteLine(ex.ToString());
                     System.Console.Write("Press a key to exit...");

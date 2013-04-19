@@ -236,8 +236,8 @@ namespace J.Console
         internal bool Loopback = true;
 
         internal bool ReplMode = false;
-        internal string LaunchFile = string.Empty;
-        internal string Backend = "standard";
+        internal string LaunchFile = null;
+        internal string Backend = null;
         internal bool EnableAttach = false;
         internal string Server = "127.0.0.1";
 
