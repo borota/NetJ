@@ -71,12 +71,12 @@ namespace J.Console
                     };
                     if (_options.Interactive)
                     {
-                        _jSession.SetOutput((jt, tp, s) =>
+                        _jSession.SetStringOutput((tp, s) =>
                         {
                             if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
                             System.Console.Out.Write(s); System.Console.Out.Flush();
                         });
-                        _jSession.SetInput((jt, prompt) => JInput(jt, prompt));
+                        _jSession.SetInput(JInput);
                         _jSession.SetType(JSession.SMCON);
 
                         _jSession.ApplyCallbacks();
@@ -111,7 +111,7 @@ namespace J.Console
                     }
                     while (_options.Interactive)
                     {
-                        _jSession.Do(JInput(IntPtr.Zero, "   "));
+                        _jSession.Do(JInput("   "));
                     }
                     return 0;
                 }
@@ -125,7 +125,7 @@ namespace J.Console
             }
         }
 
-        private static string JInput(IntPtr jt, string prompt)
+        private static string JInput(string prompt)
         {
             System.Console.Out.Write(prompt); System.Console.Out.Flush();
             var line = System.Console.In.ReadLine();

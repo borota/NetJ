@@ -12,6 +12,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jsmtest", "jsm\jsmtest.vcxp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jsm", "jsm\jsm.vcxproj", "{F1206774-9E39-4A80-A056-99955860A046}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "J.SessionManager.Test", "J.SessionManager.Test\J.SessionManager.Test.csproj", "{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -52,6 +54,14 @@ Global
 		{F1206774-9E39-4A80-A056-99955860A046}.Release|x64.Build.0 = Release|x64
 		{F1206774-9E39-4A80-A056-99955860A046}.Release|x86.ActiveCfg = Release|Win32
 		{F1206774-9E39-4A80-A056-99955860A046}.Release|x86.Build.0 = Release|Win32
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Debug|x64.ActiveCfg = Debug|x64
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Debug|x64.Build.0 = Debug|x64
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Debug|x86.ActiveCfg = Debug|x86
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Debug|x86.Build.0 = Debug|x86
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Release|x64.ActiveCfg = Release|x64
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Release|x64.Build.0 = Release|x64
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Release|x86.ActiveCfg = Release|x86
+		{EA2E9CD3-ABDD-49B3-B586-3C08A8C2AD2C}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

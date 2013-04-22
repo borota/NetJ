@@ -21,6 +21,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+#if _DEBUG
+        //printf("DLL_PROCESS_ATTACH entered.\n");
+#endif
         jtMutex = CreateMutex(NULL, FALSE, NULL);
         if (NULL == jtMutex) {
             printf("CreateMutex error: %d\n", GetLastError());
@@ -35,6 +38,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
     case DLL_THREAD_DETACH:
         break;
     case DLL_PROCESS_DETACH:
+#if _DEBUG
+        //printf("DLL_PROCESS_DETACH entered.\n");
+#endif
         if (NULL != jts) {
             free(jts);
             jts = NULL;
@@ -389,15 +395,16 @@ static BOOL GetJProcAddresses(HMODULE hModule) {
     CHAR fullPath[MAX_PATH];
     int len;
 
-    GetModuleFileName(hModule, fullPath, MAX_PATH);
-    fsp = strrchr(fullPath, '\\') + 1;
-    strcpy_s(fsp, strlen(JDLLNAME) + 1, JDLLNAME);
-    hJdll = LoadLibrary(fullPath); // from jsm.dll directory
-    if (NULL == hJdll) {
-        if (0 < (len = GetEnvironmentVariable("JPATH", fullPath, MAX_PATH)) && len < MAX_PATH)
-        {
-            hJdll = LoadLibrary(fullPath); // from JPATH environment variable
-        }
+    if (0 < (len = GetEnvironmentVariable("JPATH", fullPath, MAX_PATH)) && len < MAX_PATH)
+    {
+        hJdll = LoadLibrary(fullPath); // from JPATH environment variable
+    }
+    else 
+    {
+        GetModuleFileName(hModule, fullPath, MAX_PATH);
+        fsp = strrchr(fullPath, '\\') + 1;
+        strcpy_s(fsp, strlen(JDLLNAME) + 1, JDLLNAME);
+        hJdll = LoadLibrary(fullPath); // from jsm.dll directory
     }
     if (NULL == hJdll) 
     {

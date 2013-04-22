@@ -12,6 +12,8 @@ J.2012.sln  - Visual Studio 2012 solution
 
  * J.SessionManager - .NET C# PInvoke based wrapper around jsm.dll.
 
+ * J.SessionManager.Test - Windows Forms application illustrating J.SessionManager.dll use. UTF8 noun values are supported.
+
  * J.Console - .NET j consoles illustrating J.SessionManager.dll use.
 
 Select x86 Platform to compile for 32 bit or x64 for 64 bit.

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Generic;
 
 namespace J.SessionManager
 {
@@ -11,6 +12,9 @@ namespace J.SessionManager
         private readonly int _sid;
         private readonly IntPtr[] _callbacks;
         private bool _disposed;
+        private const int _maxInput = 30000;
+        private byte[] _byteInput;
+        private IntPtr _ptrInput;
 
         // smoptions
         public const int SMWIN = 0;  /* j.exe    Jwdw (Windows) front end */
@@ -42,19 +46,70 @@ namespace J.SessionManager
 
         #region - Method -
 
-        public void SetOutput(OutputType outputType)
+        public void SetStringOutput(StringOutputType outputType)
         {
-            this._callbacks[0] = Marshal.GetFunctionPointerForDelegate(outputType);
+            this._callbacks[0] = Marshal.GetFunctionPointerForDelegate(((InteropOutputType)((jt, type, output) => {
+                string o = null;
+                if (null != output && IntPtr.Zero != output)
+                {
+                    byte[] bo = this.ByteFromPtr(output);
+                    o = Encoding.UTF8.GetString(bo);
+                }
+                outputType(type, o);
+            })));
+        }
+
+        public void SetByteOutput(ByteOutputType outputType)
+        {
+            this._callbacks[0] = Marshal.GetFunctionPointerForDelegate(((InteropOutputType)((jt, type, output) =>
+            {
+                byte[] o = null;
+                if (null != output && IntPtr.Zero != output)
+                {
+                    o = this.ByteFromPtr(output);
+                }
+                outputType(type, o);
+            })));
+        }
+
+        public byte[] ByteFromPtr(IntPtr ptr)
+        {
+            var data = new List<byte>();
+            var off = 0;
+            while (true)
+            {
+                var ch = Marshal.ReadByte(ptr, off++);
+                if (ch == 0)
+                {
+                    break;
+                } 
+                data.Add(ch);
+            }
+            return data.ToArray();
         }
 
         public void SetDoWd(DoWdType doWdType)
         {
-            this._callbacks[1] = Marshal.GetFunctionPointerForDelegate(doWdType);
+            this._callbacks[1] = Marshal.GetFunctionPointerForDelegate((InteropDoWdType)((IntPtr jt, int x, ref A parg, ref IntPtr press) => doWdType(x, ref parg, ref press)));
         }
 
         public void SetInput(InputType inputType)
         {
-            this._callbacks[2] = Marshal.GetFunctionPointerForDelegate(inputType);
+            // Not sure when/how this gets used so this is was never tested
+            this._callbacks[2] = Marshal.GetFunctionPointerForDelegate((InteropInputType)((jt, prompt) =>
+                {
+                    if (null == this._ptrInput)
+                    {
+                        this._byteInput = new byte[_maxInput];
+                        this._ptrInput = Marshal.AllocHGlobal(_maxInput + 1);
+                    }
+                    string inp = inputType(prompt);
+                    int byteCnt = Encoding.UTF8.GetBytes(inp, 0, inp.Length, this._byteInput, 0);
+                    System.Console.WriteLine(byteCnt);
+                    Marshal.Copy(this._byteInput, 0, this._ptrInput, byteCnt);
+                    Marshal.WriteByte(this._ptrInput, byteCnt, 0); // null terminated
+                    return this._ptrInput;
+                }));
         }
 
         public void SetType(int type)
@@ -75,7 +130,7 @@ namespace J.SessionManager
         {
             if (this._sid > -1)
             {
-                return JSession.JDo(this._sid, sentence);
+                return JSession.JDo(this._sid, Encoding.UTF8.GetBytes(sentence));
             }
             return this._sid;
         }
@@ -113,6 +168,7 @@ namespace J.SessionManager
                 if (disposing)
                 {
                     // Dispose managed resources.
+                    Marshal.FreeHGlobal(this._ptrInput);
                 }
                 this.Free();
                 this._disposed = true;
@@ -134,14 +190,21 @@ namespace J.SessionManager
 
         private const string _dllName = "jsm.dll";
 
-        [DllImport(_dllName)]
-        private static extern int JInit();
+        /// Return Type: int
+        [DllImport(_dllName, EntryPoint = "JInit", CallingConvention = CallingConvention.StdCall)]
+        public static extern int JInit();
 
-        [DllImport(_dllName)]
-        private static extern int JSM(int sid, [In][MarshalAs(UnmanagedType.LPArray)] IntPtr[] callbacks);
+        /// Return Type: int
+        /// sid: int
+        /// callback: void**
+        [DllImport(_dllName, EntryPoint = "JSM", CallingConvention = CallingConvention.StdCall)]
+        public static extern int JSM([In]int sid, [In][MarshalAs(UnmanagedType.LPArray)]IntPtr[] callback);
 
-        [DllImport(_dllName)]
-        private static extern int JDo(int sid, [MarshalAs(UnmanagedType.LPStr)]string sentence);
+        /// Return Type: int
+        /// sid: int
+        /// sentence: C*
+        [DllImport(_dllName, EntryPoint = "JDo", CallingConvention = CallingConvention.StdCall)]
+        public static extern int JDo([In]int sid, [In]byte[] sentence);
 
         [DllImport(_dllName)]
         private static extern string JGetLocale(int sid);
@@ -174,13 +237,21 @@ namespace J.SessionManager
         private static extern byte JIncAdBreak(int idx);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        public delegate void OutputType(IntPtr jt, int type, [MarshalAs(UnmanagedType.LPStr)]string s);
+        public delegate void InteropOutputType([In]IntPtr jt, [In]int type, [In]IntPtr output);
+        
+        public delegate void StringOutputType(int type, string output);
+
+        public delegate void ByteOutputType(int type, byte[] output);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        public delegate int DoWdType(IntPtr jt, int x, ref A parg, ref IntPtr press);
+        public delegate int InteropDoWdType([In]IntPtr jt, [In]int x, ref A parg, ref IntPtr press); // never tested.
+
+        public delegate int DoWdType(int x, ref A parg, ref IntPtr press);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        public delegate string InputType(IntPtr jt, [MarshalAs(UnmanagedType.LPStr)]string prompt);
+        public delegate IntPtr InteropInputType([In]IntPtr jt, [In][MarshalAs(UnmanagedType.LPStr)]string prompt);
+
+        public delegate string InputType(string prompt);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct A
