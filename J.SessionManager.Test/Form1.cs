@@ -12,10 +12,12 @@ namespace J.SessionManager.Test
     public partial class Form1 : Form
     {
         JSession _jSession;
+        Form2 _form2;
 
         public Form1()
         {
             InitializeComponent();
+            this._form2 = new Form2();
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -26,6 +28,11 @@ namespace J.SessionManager.Test
                 this.textBox2.Text +=  output.Replace("\n", "\r\n");
                 this.textBox2.SelectionStart = this.textBox2.Text.Length;
                 this.textBox2.ScrollToCaret();
+            });
+            _jSession.SetInput((p) =>
+            {
+                this._form2.ShowDialog();
+                return this._form2.textBox1.Text.Trim();
             });
             _jSession.ApplyCallbacks();
         }
