@@ -18,4 +18,6 @@ J.2012.sln  - Visual Studio 2012 solution
 
 Select x86 Platform to compile for 32 bit or x64 for 64 bit.
 
+Compiled binaries are found under [J.701/x86](https://github.com/borota/NetJ/tree/master/J.701/x86) and [J.701/x64](https://github.com/borota/NetJ/tree/master/J.701/x64).
+
 J can be downloaded from [Jsoftware](http://www.jsoftware.com/).
