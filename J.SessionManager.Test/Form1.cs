@@ -32,7 +32,11 @@ namespace J.SessionManager.Test
             _jSession.SetInput((p) =>
             {
                 this._form2.ShowDialog();
-                return this._form2.textBox1.Text.Trim();
+                var result = this._form2.textBox1.Text;
+                this.textBox2.Text += result + "\r\n";
+                this.textBox2.SelectionStart = this.textBox2.Text.Length;
+                this.textBox2.ScrollToCaret();
+                return result;
             });
             _jSession.ApplyCallbacks();
         }
@@ -52,7 +56,7 @@ namespace J.SessionManager.Test
             else
             {
                 this.textBox1.Text = string.Empty;
-                this.textBox2.Text += ")" + sentence + "\r\n";
+                this.textBox2.Text += "    " + sentence + "\r\n";
                 this.textBox2.SelectionStart = this.textBox2.Text.Length;
                 this.textBox2.ScrollToCaret();
                 _jSession.Do(sentence);
