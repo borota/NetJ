@@ -15,6 +15,14 @@ namespace J.Console
         private static string _input = null;
         private static string _programName;
         private static CmdLineOptions _options;
+        private static ConsoleType _consoleType;
+
+        private enum ConsoleType
+        {
+            Regular,
+            Server,
+            Client
+        }
 
         private static int Main(string[] argv)
         {
@@ -56,12 +64,25 @@ namespace J.Console
                     {
                         throw new Exception("Missing PORT for client mode session.");
                     }
+
+                    if (_options.Interactive && _options.Ports.Count < 1)
+                    {
+                        _consoleType = ConsoleType.Regular;
+                    }
+                    else if (_options.ReplMode)
+                    {
+                        _consoleType = ConsoleType.Client;
+                    }
+                    else
+                    {
+                        _consoleType = ConsoleType.Server;
+                    }
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
                     System.Console.WriteLine();
                     System.Console.Write(string.Format("{0}: ", _programName));
-                    System.Console.WriteLine(e.Message);
+                    System.Console.WriteLine(ex.Message);
                     System.Console.WriteLine(string.Format("Try '{0} --help' for more information.", _programName));
                     return 1;
                 }
@@ -72,7 +93,8 @@ namespace J.Console
                         e.Cancel = true;
                         _jSession.IncAdBreak();
                     };
-                    if (_options.Interactive)
+                    _jSession.SetType(JSession.SMCON);
+                    if (ConsoleType.Regular == _consoleType) // normal interactive console read/write to standard streams.
                     {
                         _jSession.SetStringOutput((tp, s) =>
                         {
@@ -80,8 +102,6 @@ namespace J.Console
                             System.Console.Out.Write(s); System.Console.Out.Flush();
                         });
                         _jSession.SetInput(JInput);
-                        _jSession.SetType(JSession.SMCON);
-
                         _jSession.ApplyCallbacks();
                     }
                     int type;
@@ -93,18 +113,18 @@ namespace J.Console
                         type = 0;
                     AddArgs();
                     JeFirst(type);
-                    if (0 < _options.Ports.Count)
+                    if (ConsoleType.Regular != _consoleType)
                     {
                         var threadCount = _options.Interactive ? _options.Ports.Count : _options.Ports.Count - 1;
                         for (int i = 0; i < threadCount; i++)
                         {
-                            // create listening threads.
+                            ServerProc(_options.Ports[i]);
                         }
                         if (!_options.Interactive) // use main thread
                         {
-                            if (_options.ReplMode)
+                            if (ConsoleType.Client == _consoleType)
                             {
-                                ClientProc(_options);
+                                ClientProc(_options, _jSession);
                             }
                             else
                             {
@@ -223,13 +243,15 @@ namespace J.Console
             System.Console.WriteLine("Usual jconsole options (-jprofile, -js, etc.) are supported unchanged.");
         }
 
-        private static void ClientProc(CmdLineOptions cmdLineOptions)
+        private static void ClientProc(CmdLineOptions cmdLineOptions, JSession jSession)
         {
-            ReplProcessor.Run(cmdLineOptions);
+            throw new NotImplementedException();
+            ReplProcessor.Run(cmdLineOptions, jSession);
         }
 
         private static void ServerProc(ushort port)
         {
+            throw new NotImplementedException();
         }
     }
 

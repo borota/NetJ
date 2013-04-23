@@ -16,12 +16,12 @@ namespace J.Console
     {
         private const string _debugReplEnv = "DEBUG_REPL";
         private static bool _isDebug = Environment.GetEnvironmentVariable(_debugReplEnv) != null;
-        private CmdLineOptions _cmdLineOptions;
+        private CmdLineOptions _cmdLine;
         private Thread _replThread;
 
         private ReplProcessor(CmdLineOptions cmdLineOptions)
         {
-            this._cmdLineOptions = cmdLineOptions;
+            this._cmdLine = cmdLineOptions;
             this._replThread = null;
         }
 
@@ -35,7 +35,7 @@ namespace J.Console
         /// </summary>
         private static byte[] Cmd(string cmd)
         {
-            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetBytes(cmd) : Encoding.ASCII.GetBytes(cmd);
+            return ReplProcessor.Utf8Enabled ? Encoding.UTF8.GetBytes(cmd) : Encoding.ASCII.GetBytes(cmd);
         }
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace J.Console
         /// </summary>
         private static string Cmd(byte[] cmd)
         {
-            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetString(cmd) : Encoding.ASCII.GetString(cmd);
+            return ReplProcessor.Utf8Enabled ? Encoding.UTF8.GetString(cmd) : Encoding.ASCII.GetString(cmd);
         }
 
         /// <summary>
@@ -51,12 +51,20 @@ namespace J.Console
         /// </summary>
         private static string Cmd(byte[] cmd, int count)
         {
-            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetString(cmd, 0, count) : Encoding.ASCII.GetString(cmd, 0, count);
+            return ReplProcessor.Utf8Enabled ? Encoding.UTF8.GetString(cmd, 0, count) : Encoding.ASCII.GetString(cmd, 0, count);
         }
 
-        private static bool Utf8Enabled()
+        private static bool Utf8Enabled
         {
-            return true;
+            get
+            {
+                return true;
+            }
+        }
+
+        private static void ExitWorkItem()
+        {
+            Environment.Exit(0);
         }
 
         public class UnsupportedReplException : Exception
@@ -74,7 +82,7 @@ namespace J.Console
         /// communication with the remote process while derived classes implement the 
         /// actual inspection and introspection.
         /// </summary>
-        public class ReplBackend
+        internal class ReplBackend : IDisposable
         {
             protected static readonly byte[] _MRES;
             protected static readonly byte[] _SRES;
@@ -108,26 +116,29 @@ namespace J.Console
             }
 
             protected readonly ReplProcessor _replProc;
+            private readonly Dictionary<string, Action> _COMMANDS;
+            protected readonly JSession _jSession;
+            protected bool _disposed;
+
             private TcpClient _conn;
             /// <summary>
             /// TODO: Make sure stream is closed.
             /// </summary>
             protected NetworkStream _stream;
-            protected JSession _jSession;
+            private readonly object _sendLocker;
+            private readonly object _inputLocker;
+            private InputLock _inputEvent;
             private string _inputString;
             private bool _exitRequested;
-            private readonly Dictionary<string, Action> _COMMANDS;
-            private readonly object _sendLock = new object();
-            private readonly object _inputLock = new object();
+
 #if DEBUG
             private Thread _sendLockedThread;
             private Thread _inputLockedThread;
 #endif
 
-            public ReplBackend(ReplProcessor replProcessor)
+            public ReplBackend(ReplProcessor replProcessor, JSession jSession)
             {
                 this._replProc = replProcessor;
-
                 this._COMMANDS = new Dictionary<string, Action>()
                 {
                     { "run ", this.CmdRun },
@@ -142,16 +153,60 @@ namespace J.Console
                     { "excf", this.CmdExcf },
                     { "dbga", this.CmdDebugAttach }
                 };
+                this._jSession = jSession;
+                this._disposed = false;
 
                 this._conn = null;
                 this._stream = null;
+                this._sendLocker = new object();
+                this._inputLocker = new object();
+                this._inputEvent = new InputLock(this); // lock starts acquired (we use it like a manual reset event)
+
                 this._inputString = null;
                 this._exitRequested = false;
             }
 
+            ~ReplBackend()
+            {
+                Dispose(false);
+            }
+
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
+            protected virtual void Dispose(bool disposing)
+            {
+                if (!this._disposed)
+                {
+                    // If disposing equals true, dispose all managed and unmanaged resources. 
+                    if (disposing)
+                    {
+                        // Dispose managed resources.
+                        if (null != this._stream)
+                        {
+                            this._stream.Close();
+                            this._stream = null;
+                        }
+                        if (null != this._conn)
+                        {
+                            this._conn.Close();
+                            this._conn = null;
+                        }
+                    }
+                    // Call the appropriate methods to clean up unmanaged resources here. 
+                    // If disposing is false, only the following code is executed.
+
+                    // Note disposing has been done.
+                    this._disposed = true;
+                }
+            }
+
             internal void Connect()
             {
-                this._conn = new TcpClient(this._replProc._cmdLineOptions.Server, this._replProc._cmdLineOptions.Ports[0]);
+                this._conn = new TcpClient(this._replProc._cmdLine.Server, this._replProc._cmdLine.Ports[0]);
                 this._stream = this._conn.GetStream();
                 this._replProc._replThread = new Thread(this.ReplLoop); // start a new thread for communicating w/ the remote process
             }
@@ -159,7 +214,7 @@ namespace J.Console
             /// <summary>
             /// TODO: revisit this method to see if you have to close previous stream, etc.
             /// </summary>
-            protected void Connect(TcpClient socket)
+            internal void Connect(TcpClient socket)
             {
                 this._conn = socket;
                 this._stream = this._conn.GetStream();
@@ -184,7 +239,7 @@ namespace J.Console
                         /* we receive a series of 4 byte commands. Each command then has it's
                            own format which we must parse before continuing to the next command. */
                         this.Flush();
-                        this._conn.ReceiveTimeout = 10000; // 10 sec
+                        this._stream.ReadTimeout = 10000; // 10 sec
                         try
                         {
                             size = this._stream.Read(inp, 0, 4);
@@ -201,7 +256,8 @@ namespace J.Console
                             }
                             throw;
                         }
-                        this._conn.ReceiveTimeout = 0;
+                        this._stream.ReadTimeout = Timeout.Infinite;
+
                         if (size < 1)
                         {
                             break;
@@ -241,6 +297,7 @@ namespace J.Console
                 {
                     foreach (var d in data)
                     {
+                        ReplProcessor.DebugWrite(d + '\n');
                         this._stream.Write(ReplProcessor.Cmd(d));
                     }
                 }
@@ -263,9 +320,13 @@ namespace J.Console
             /// </summary>
             private string ReadString()
             {
-                byte[] r = new byte[this._stream.ReadInt32()];
-                this._stream.Read(r);
-                return Encoding.ASCII.GetString(r);
+                int strlen = this._stream.ReadInt32();
+                if (strlen < 1 ) {
+                    return string.Empty;
+                }
+                byte[] r = new byte[strlen];
+                this._stream.Read(r, 0, strlen);
+                return ReplProcessor.Utf8Enabled ? Encoding.UTF8.GetString(r) : Encoding.ASCII.GetString(r);
             }
 
             /// <summary>
@@ -312,7 +373,7 @@ namespace J.Console
                     ReplProcessor.DebugWrite(ex.ToString());
                     return;
                 }
-                using(new SendLock())
+                using(new SendLock(this))
                 {
                     this._stream.Write(ReplBackend._MRES);
                     this.WriteString(memberTuple.Name);
@@ -327,7 +388,25 @@ namespace J.Console
             private void CmdSigs()
             {
                 string expression = this.ReadString();
-                throw new NotImplementedException();
+                object sigs = null;
+                try
+                {
+                    // TODO
+                    sigs = this.GetSignatures();
+                }
+                catch (Exception ex)
+                {
+                    this.Send("SERR");
+                    ReplProcessor.DebugWrite("error in eval");
+                    ReplProcessor.DebugWrite(ex.ToString());
+                    return;
+                }
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._SRES);
+                    // TODO
+                }
+                
             }
 
             /// <summary>
@@ -365,7 +444,7 @@ namespace J.Console
                 {
                     locs = new List<LocaleTuple>();
                 }
-                using (new SendLock())
+                using (new SendLock(this))
                 {
                     this._stream.Write(ReplBackend._LOCS);
                     this._stream.WriteInt64(locs.Count);
@@ -383,7 +462,7 @@ namespace J.Console
             private void CmdInpl()
             {
                 this._inputString = this.ReadString();
-                //self.input_event.release()
+                this._inputEvent.Dispose();
             }
 
             /// <summary>
@@ -401,7 +480,142 @@ namespace J.Console
             /// </summary>
             private void CmdDebugAttach()
             {
+                int port = this._stream.ReadInt32();
+                string id = this.ReadString();
+                this.AttachProcess(port, id);
+            }
+
+            private void WriteMemberDict(Dictionary<string, TypeTuple> memDict)
+            {
+                this._stream.WriteInt64(memDict.Count);
+                foreach (TypeTuple mt in memDict.Values)
+                {
+                    this.WriteString(mt.Name);
+                    this.WriteString(mt.TypeName);
+                }
+            }
+
+            protected void WriteString(string str)
+            {
+                if (ReplProcessor.Utf8Enabled)
+                {
+                    this._stream.Write(ReplBackend._UNICODE_PREFIX);
+                    this._stream.WriteUtf8String(str);
+                }
+                else
+                {
+                    this._stream.Write(ReplBackend._ASCII_PREFIX);
+                    this._stream.WriteAsciiString(str);
+                }
+            }
+
+            protected void OnDebuggerDetach()
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._DETC);
+                }
+            }
+
+            protected void InitDebugger()
+            {
                 throw new NotImplementedException();
+            }
+
+            protected void SendImage(string filename)
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._IMGD);
+                    this.WriteString(filename);
+                }
+            }
+
+            protected void WritePng(byte[] imageBytes)
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._DPNG);
+                    this._stream.WriteInt32(imageBytes.Length);
+                    this._stream.Write(imageBytes);
+                }
+            }
+
+            /// <summary>
+            /// sends the current prompt to the interactive window
+            /// </summary>
+            protected void SendPrompt(string ps1, string ps2, bool updateAll = true)
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._PRPC);
+                    this.WriteString(ps1);
+                    this.WriteString(ps2);
+                    this._stream.WriteInt32(updateAll ? 1 : 0);
+                }
+            }
+
+            /// <summary>
+            /// reports that an error occured to the interactive window
+            /// </summary>
+            protected void SendError()
+            {
+                this.Send("ERRE");
+            }
+
+            /// <summary>
+            /// reports the that the REPL process has exited to the interactive window
+            /// </summary>
+            protected void SendExit()
+            {
+                this.Send("EXIT");
+            }
+
+            protected void SendCommandExecuted()
+            {
+                this.Send("DONE");
+            }
+
+            protected void SendLocalesChanged()
+            {
+                this.Send("LOCC");
+            }
+
+            /// <summary>
+            /// reads a line of input from standard input
+            /// </summary>
+            protected string ReadLine()
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._RDLN);
+                }
+                this._inputEvent = new InputLock(this);
+                return this._inputString;
+            }
+
+            /// <summary>
+            /// writes a string to standard output in the remote console
+            /// </summary>
+            protected void WriteStdout(string value)
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._STDO);
+                    this.WriteString(value);
+                }
+            }
+
+            /// <summary>
+            /// writes a string to standard error in the remote console
+            /// </summary>
+            protected void WriteSterr(string value)
+            {
+                using (new SendLock(this))
+                {
+                    this._stream.Write(ReplBackend._STDE);
+                    this.WriteString(value);
+                }
             }
 
             /// <summary>
@@ -495,82 +709,18 @@ namespace J.Console
             /// <summary>
             /// starts processing execution requests
             /// </summary>
-            protected virtual void AttachProcess(ushort port, int debuggerId)
+            protected virtual void AttachProcess(int port, string debuggerId)
             {
                 throw new NotImplementedException();
             }
 
-            private void WriteMemberDict(Dictionary<string, TypeTuple> memDict)
-            {
-                this._stream.WriteInt64(memDict.Count);
-                foreach (TypeTuple mt in memDict.Values)
-                {
-                    this.WriteString(mt.Name);
-                    this.WriteString(mt.TypeName);
-                }
-            }
-
-            protected void WriteString(string str)
-            {
-                if (ReplProcessor.Utf8Enabled())
-                {
-                    this._stream.Write(ReplBackend._UNICODE_PREFIX);
-                    this._stream.WriteUtf8String(str);
-                }
-                else
-                {
-                    this._stream.Write(ReplBackend._ASCII_PREFIX);
-                    this._stream.WriteAsciiString(str);
-                }
-            }
-
-            /// <summary>
-            /// sends the current prompt to the interactive window
-            /// </summary>
-            protected void SendPrompt(string ps1, string ps2, bool updateAll = true)
-            {
-                using (new SendLock())
-                {
-                    this._stream.Write(ReplBackend._PRPC);
-                    this.WriteString(ps1);
-                    this.WriteString(ps2);
-                    this._stream.WriteInt64(updateAll ? 1 : 0);
-                }
-            }
-
-            /// <summary>
-            /// reports that an error occured to the interactive window
-            /// </summary>
-            protected void SendError()
-            {
-                this.Send("ERRE");
-            }
-
-            /// <summary>
-            /// reports the that the REPL process has exited to the interactive window
-            /// </summary>
-            protected void SendExit()
-            {
-                this.Send("EXIT");
-            }
-
-            protected void SendCommandExecuted()
-            {
-                this.Send("DONE");
-            }
-
-            protected void SendLocalesChanged()
-            {
-                this.Send("LOCC");
-            }
-
-            protected struct SendLock : IDisposable
+            protected class SendLock : IDisposable
             {
                 private readonly ReplBackend _evaluator;
 
                 public SendLock(ReplBackend evaluator)
                 {
-                    Monitor.Enter(evaluator._sendLock);
+                    Monitor.Enter(evaluator._sendLocker);
 #if DEBUG
                     Debug.Assert(evaluator._sendLockedThread == null);
                     evaluator._sendLockedThread = Thread.CurrentThread;
@@ -583,17 +733,17 @@ namespace J.Console
 #if DEBUG
                     _evaluator._sendLockedThread = null;
 #endif
-                    Monitor.Exit(_evaluator._sendLock);
+                    Monitor.Exit(_evaluator._sendLocker);
                 }
             }
 
-            protected struct InputLock : IDisposable
+            protected class InputLock : IDisposable
             {
                 private readonly ReplBackend _evaluator;
 
                 public InputLock(ReplBackend evaluator)
                 {
-                    Monitor.Enter(evaluator._inputLock);
+                    Monitor.Enter(evaluator._inputLocker);
 #if DEBUG
                     Debug.Assert(evaluator._inputLockedThread == null);
                     evaluator._inputLockedThread = Thread.CurrentThread;
@@ -606,7 +756,7 @@ namespace J.Console
 #if DEBUG
                     _evaluator._inputLockedThread = null;
 #endif
-                    Monitor.Exit(_evaluator._inputLock);
+                    Monitor.Exit(_evaluator._inputLocker);
                 }
             }
 
@@ -649,11 +799,34 @@ namespace J.Console
             }
         }
 
-        class BasicReplBackend : ReplBackend
+        internal class BasicReplBackend : ReplBackend
         {
-            internal BasicReplBackend(ReplProcessor replProcessor)
-                : base(replProcessor)
+            private readonly object _executeItemLocker;
+            private ExecuteItemLock _executeItemLock;
+#if DEBUG
+            private Thread _executeItemLockedThread;
+#endif
+
+            internal BasicReplBackend(ReplProcessor replProcessor, JSession jSession)
+                : this(replProcessor, jSession, null)
             {
+            }
+
+            internal BasicReplBackend(ReplProcessor replProcessor, JSession jSession, string locale)
+                : base(replProcessor, jSession)
+            {
+                this._executeItemLocker = new object();
+
+                if (null != locale && string.Empty != locale.Trim())
+                {
+                    this._jSession.Do(string.Format("18!:4 <'{0}'", locale));
+                }
+                this._executeItemLock = new ExecuteItemLock(this); // lock starts acquired (we use it like manual reset event)
+            }
+
+            internal void InitConnection()
+            {
+
             }
 
             /// <summary>
@@ -662,46 +835,66 @@ namespace J.Console
             internal override void ExecutionLoop()
             {
                 this.SendPrompt("    ", "");
-                using (_jSession = new JSession())
+                if (null != this._replProc._cmdLine.LaunchFile)
                 {
-                    if (null != this._replProc._cmdLineOptions.LaunchFile)
+                    try
                     {
-                        try
-                        {
-                            runFileAsBase();
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Console.WriteLine("error in launching startup script:");
-                            System.Console.WriteLine(ex.ToString());
-                        }
+                        runFileAsBase();
                     }
-                    while (true)
+                    catch (Exception ex)
                     {
+                        System.Console.WriteLine("error in launching startup script:");
+                        System.Console.WriteLine(ex.ToString());
                     }
+                }
+                while (true)
+                {
                 }
             }
 
             private void runFileAsBase()
             {
-                string fileContent = System.IO.File.ReadAllText(this._replProc._cmdLineOptions.LaunchFile).Replace("\r\n", "\n");
+                string fileContent = System.IO.File.ReadAllText(this._replProc._cmdLine.LaunchFile).Replace("\r\n", "\n");
                 _jSession.Do(fileContent);
             }
 
             internal void InitDebugger()
             {
             }
+
+            protected class ExecuteItemLock : IDisposable
+            {
+                private readonly BasicReplBackend _evaluator;
+
+                public ExecuteItemLock(BasicReplBackend evaluator)
+                {
+                    Monitor.Enter(evaluator._executeItemLocker);
+#if DEBUG
+                    Debug.Assert(evaluator._executeItemLockedThread == null);
+                    evaluator._executeItemLockedThread = Thread.CurrentThread;
+#endif
+                    _evaluator = evaluator;
+                }
+
+                public void Dispose()
+                {
+#if DEBUG
+                    _evaluator._executeItemLockedThread = null;
+#endif
+                    Monitor.Exit(_evaluator._executeItemLocker);
+                }
+            }
         }
 
-        private void RunRepl()
+        private void RunRepl(JSession jSession)
         {
             BasicReplBackend backendType = null;
             string backendError = null;
-            if (null != this._cmdLineOptions.Backend && !this._cmdLineOptions.Backend.Equals("standard", StringComparison.OrdinalIgnoreCase))
+            if (null != this._cmdLine.Backend && !this._cmdLine.Backend.Equals("standard", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
-                    backendType = (BasicReplBackend)Activator.CreateInstance(Type.GetType(this._cmdLineOptions.Backend), this);
+                    backendType = (BasicReplBackend)Activator.CreateInstance(Type.GetType(this._cmdLine.Backend), this, jSession);
                 }
                 catch (UnsupportedReplException ex)
                 {
@@ -709,42 +902,42 @@ namespace J.Console
                 }
                 catch (Exception ex)
                 {
-                    backendError = ex.ToString();
+                    backendError = ex.Message;
                 }
             }
             if (null == backendType)
             {
-                backendType = new BasicReplBackend(this);
+                backendType = new BasicReplBackend(this, jSession);
             }
-            backendType.Connect();
-            if (this._cmdLineOptions.EnableAttach)
+            using (backendType)
             {
-                backendType.InitDebugger();
-            }
+                backendType.Connect();
+                if (this._cmdLine.EnableAttach)
+                {
+                    backendType.InitDebugger();
+                }
 
-            if (null != backendError)
-            {
-                System.Console.Error.WriteLine("Error using selected REPL back-end:");
-                System.Console.Error.WriteLine(backendError);
-                System.Console.Error.WriteLine("Using standard backend instead.");
+                if (null != backendError)
+                {
+                    System.Console.Error.WriteLine("Error using selected REPL back-end:");
+                    System.Console.Error.WriteLine(backendError);
+                    System.Console.Error.WriteLine("Using standard backend instead.");
+                }
+                backendType.ExecutionLoop();                
             }
-            backendType.ExecutionLoop();
         }
 
-        internal static void Run(CmdLineOptions cmdLineOptions)
+        internal static void Run(CmdLineOptions cmdLineOptions, JSession jSession)
         {
             try
             {
-                var proc = new ReplProcessor(cmdLineOptions);
-                proc.RunRepl();
+                new ReplProcessor(cmdLineOptions).RunRepl(jSession);
             }
             catch (Exception ex)
             {
                 if (ReplProcessor._isDebug)
                 {
                     System.Console.WriteLine(ex.ToString());
-                    System.Console.Write("Press a key to exit...");
-                    System.Console.ReadKey(true);
                 }
                 throw;
             }
