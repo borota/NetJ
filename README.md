@@ -14,7 +14,7 @@ J.2012.sln  - Visual Studio 2012 solution
 
  * J.SessionManager.Test - Windows Forms application illustrating J.SessionManager.dll use. UTF8 noun values are supported.
 
- * J.Console - .NET j consoles illustrating J.SessionManager.dll use.
+ * J.Console - .NET j consoles illustrating J.SessionManager.dll use. For UTF8 support, select Consolas or Lucida Console font. 
 
 Select x86 Platform to compile for 32 bit or x64 for 64 bit.
 
