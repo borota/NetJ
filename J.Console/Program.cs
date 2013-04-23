@@ -101,7 +101,7 @@ namespace J.Console
                         {
                             if (_options.ReplMode)
                             {
-                                ClientProc(_options.Ports[threadCount]);
+                                ClientProc(_options);
                             }
                             else
                             {
@@ -220,8 +220,9 @@ namespace J.Console
             System.Console.WriteLine("Usual jconsole options (-jprofile, -js, etc.) are supported unchanged.");
         }
 
-        private static void ClientProc(ushort port)
+        private static void ClientProc(CmdLineOptions cmdLineOptions)
         {
+            ReplProcessor.Run(cmdLineOptions);
         }
 
         private static void ServerProc(ushort port)

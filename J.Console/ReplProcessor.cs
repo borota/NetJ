@@ -1,14 +1,13 @@
 ﻿/*
- * Based on code from PTVS licensed by Microsoft under Apache License, Version 2.0.
+ * Used ideas from PTVS code licensed by Microsoft under Apache License, Version 2.0.
  */
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Diagnostics;
 using J.SessionManager;
 
 namespace J.Console
@@ -28,31 +27,36 @@ namespace J.Console
 
         private static void DebugWrite(string msg)
         {
-            if (_isDebug)
-            {
-                System.Console.Write(msg);
-                System.Console.Out.Flush();
-            }
+            if (_isDebug) { System.Console.Write(msg); System.Console.Out.Flush(); }
         }
 
+        /// <summary>
+        /// creates command bytes for sending out via sockets
+        /// </summary>
         private static byte[] Cmd(string cmd)
         {
-            return Encoding.ASCII.GetBytes(cmd);
+            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetBytes(cmd) : Encoding.ASCII.GetBytes(cmd);
         }
 
+        /// <summary>
+        /// creates command string from bytes
+        /// </summary>
         private static string Cmd(byte[] cmd)
         {
-            return Encoding.ASCII.GetString(cmd);
+            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetString(cmd) : Encoding.ASCII.GetString(cmd);
         }
 
+        /// <summary>
+        /// creates command string from count number of bytes
+        /// </summary>
         private static string Cmd(byte[] cmd, int count)
         {
-            return Encoding.ASCII.GetString(cmd, 0, count);
+            return ReplProcessor.Utf8Enabled() ? Encoding.UTF8.GetString(cmd, 0, count) : Encoding.ASCII.GetString(cmd, 0, count);
         }
 
-        private static bool IsUnicode()
+        private static bool Utf8Enabled()
         {
-            return false;
+            return true;
         }
 
         public class UnsupportedReplException : Exception
@@ -74,7 +78,7 @@ namespace J.Console
         {
             protected static readonly byte[] _MRES;
             protected static readonly byte[] _SRES;
-            protected static readonly byte[] _MODS;
+            protected static readonly byte[] _LOCS;
             protected static readonly byte[] _IMGD;
             protected static readonly byte[] _PRPC;
             protected static readonly byte[] _RDLN;
@@ -90,7 +94,7 @@ namespace J.Console
             {
                 _MRES = ReplProcessor.Cmd("MRES");
                 _SRES = ReplProcessor.Cmd("SRES");
-                _MODS = ReplProcessor.Cmd("MODS");
+                _LOCS = ReplProcessor.Cmd("LOCS");
                 _IMGD = ReplProcessor.Cmd("IMGD");
                 _PRPC = ReplProcessor.Cmd("PRPC");
                 _RDLN = ReplProcessor.Cmd("RDLN");
@@ -113,9 +117,11 @@ namespace J.Console
             private string _inputString;
             private bool _exitRequested;
             private readonly Dictionary<string, Action> _COMMANDS;
-            private readonly object _socketLock = new object();
+            private readonly object _sendLock = new object();
+            private readonly object _inputLock = new object();
 #if DEBUG
-            private Thread _socketLockedThread;
+            private Thread _sendLockedThread;
+            private Thread _inputLockedThread;
 #endif
 
             public ReplBackend(ReplProcessor replProcessor)
@@ -129,8 +135,8 @@ namespace J.Console
                     { "exit", this.CmdExit },
                     { "mems", this.CmdMems },
                     { "sigs", this.CmdSigs },
-                    { "mods", this.CmdMods },
-                    { "setm", this.CmdSetm },
+                    { "locs", this.CmdLocs },
+                    { "setl", this.CmdSetl },
                     { "sett", this.CmdSett },
                     { "inpl", this.CmdInpl },
                     { "excf", this.CmdExcf },
@@ -231,7 +237,7 @@ namespace J.Console
                 {
                     return;
                 }
-                using (new SocketLock(this))
+                using (new SendLock(this))
                 {
                     foreach (var d in data)
                     {
@@ -246,7 +252,7 @@ namespace J.Console
                 {
                     return;
                 }
-                using (new SocketLock(this))
+                using (new SendLock(this))
                 {
                     this._stream.Write(data);
                 }
@@ -306,7 +312,7 @@ namespace J.Console
                     ReplProcessor.DebugWrite(ex.ToString());
                     return;
                 }
-                using(new SocketLock())
+                using(new SendLock())
                 {
                     this._stream.Write(ReplBackend._MRES);
                     this.WriteString(memberTuple.Name);
@@ -325,12 +331,12 @@ namespace J.Console
             }
 
             /// <summary>
-            /// sets the current module which code will execute against
+            /// sets the current j locale which code will execute against
             /// </summary>
-            private void CmdSetm()
+            private void CmdSetl()
             {
-                string modName = this.ReadString();
-                this.SetCurrentModule(modName);
+                string jLocale = this.ReadString();
+                this.SetCurrentLocale(jLocale);
             }
 
             /// <summary>
@@ -345,28 +351,28 @@ namespace J.Console
             }
 
             /// <summary>
-            /// gets the list of available modules
+            /// gets the list of available locales
             /// </summary>
-            private void CmdMods()
+            private void CmdLocs()
             {
-                List<ModuleTuple> mods = null;
+                List<LocaleTuple> locs = null;
                 try
                 {
-                    mods = this.GetModuleNames();
-                    mods.Sort(new Comparison<ModuleTuple>((t1, t2) => t1.Name.CompareTo(t2.Name)));
+                    locs = this.GetLocaleNames();
+                    locs.Sort(new Comparison<LocaleTuple>((t1, t2) => t1.Name.CompareTo(t2.Name)));
                 }
                 catch
                 {
-                    mods = new List<ModuleTuple>();
+                    locs = new List<LocaleTuple>();
                 }
-                using (new SocketLock())
+                using (new SendLock())
                 {
-                    this._stream.Write(ReplBackend._MODS);
-                    this._stream.WriteInt64(mods.Count);
-                    foreach (var mod in mods)
+                    this._stream.Write(ReplBackend._LOCS);
+                    this._stream.WriteInt64(locs.Count);
+                    foreach (var loc in locs)
                     {
-                        this.WriteString(mod.Name);
-                        this.WriteString(mod.FileName);
+                        this.WriteString(loc.Name);
+                        this.WriteString(loc.FileName);
                     }
                 }
             }
@@ -415,7 +421,7 @@ namespace J.Console
             }
 
             /// <summary>
-            /// executes the given filename as the main module
+            /// executes the given filename in the base j locale
             /// </summary>
             protected virtual void ExecuteFile(string fileName, string args)
             {
@@ -455,9 +461,9 @@ namespace J.Console
             }
 
             /// <summary>
-            /// sets the module which code executes against
+            /// sets the j locale which code executes against
             /// </summary>
-            protected virtual void SetCurrentModule(string moduleName)
+            protected virtual void SetCurrentLocale(string jLocale)
             {
                 throw new NotImplementedException();
             }
@@ -471,9 +477,9 @@ namespace J.Console
             }
 
             /// <summary>
-            /// returns a list of module names
+            /// returns a list of locale names
             /// </summary>
-            protected virtual List<ModuleTuple> GetModuleNames()
+            protected virtual List<LocaleTuple> GetLocaleNames()
             {
                 throw new NotImplementedException();
             }
@@ -506,7 +512,7 @@ namespace J.Console
 
             protected void WriteString(string str)
             {
-                if (ReplProcessor.IsUnicode())
+                if (ReplProcessor.Utf8Enabled())
                 {
                     this._stream.Write(ReplBackend._UNICODE_PREFIX);
                     this._stream.WriteUtf8String(str);
@@ -519,60 +525,88 @@ namespace J.Console
             }
 
             /// <summary>
-            /// Helper struct for locking and tracking the current holding thread.  This allows
-            /// us to assert that our socket is always accessed while the lock is held.  The lock
-            /// needs to be held so that requests from the UI (switching scopes, getting module lists,
-            /// executing text, etc...) won't become interleaved with interactions from the repl process 
-            /// (output, execution completing, etc...).
+            /// sends the current prompt to the interactive window
             /// </summary>
-            protected struct SocketLock : IDisposable
+            protected void SendPrompt(string ps1, string ps2, bool updateAll = true)
             {
-                private readonly ReplBackend _evaluator;
-
-                public SocketLock(ReplBackend evaluator)
+                using (new SendLock())
                 {
-                    Monitor.Enter(evaluator._socketLock);
-#if DEBUG
-                    Debug.Assert(evaluator._socketLockedThread == null);
-                    evaluator._socketLockedThread = Thread.CurrentThread;
-#endif
-                    _evaluator = evaluator;
-                }
-
-                public void Dispose()
-                {
-#if DEBUG
-                    _evaluator._socketLockedThread = null;
-#endif
-                    Monitor.Exit(_evaluator._socketLock);
+                    this._stream.Write(ReplBackend._PRPC);
+                    this.WriteString(ps1);
+                    this.WriteString(ps2);
+                    this._stream.WriteInt64(updateAll ? 1 : 0);
                 }
             }
 
             /// <summary>
-            /// Releases the socket lock and re-acquires it when finished.  This enables
-            /// calling back into the repl window which could potentially call back to do
-            /// work w/ the evaluator that we don't want to deadlock.
+            /// reports that an error occured to the interactive window
             /// </summary>
-            protected struct SocketUnlock : IDisposable
+            protected void SendError()
+            {
+                this.Send("ERRE");
+            }
+
+            /// <summary>
+            /// reports the that the REPL process has exited to the interactive window
+            /// </summary>
+            protected void SendExit()
+            {
+                this.Send("EXIT");
+            }
+
+            protected void SendCommandExecuted()
+            {
+                this.Send("DONE");
+            }
+
+            protected void SendLocalesChanged()
+            {
+                this.Send("LOCC");
+            }
+
+            protected struct SendLock : IDisposable
             {
                 private readonly ReplBackend _evaluator;
 
-                public SocketUnlock(ReplBackend evaluator)
+                public SendLock(ReplBackend evaluator)
                 {
+                    Monitor.Enter(evaluator._sendLock);
 #if DEBUG
-                    Debug.Assert(evaluator._socketLockedThread == Thread.CurrentThread);
-                    evaluator._socketLockedThread = null;
+                    Debug.Assert(evaluator._sendLockedThread == null);
+                    evaluator._sendLockedThread = Thread.CurrentThread;
 #endif
                     _evaluator = evaluator;
-                    Monitor.Exit(evaluator._socketLock);
                 }
 
                 public void Dispose()
                 {
-                    Monitor.Enter(_evaluator._socketLock);
 #if DEBUG
-                    _evaluator._socketLockedThread = Thread.CurrentThread;
+                    _evaluator._sendLockedThread = null;
 #endif
+                    Monitor.Exit(_evaluator._sendLock);
+                }
+            }
+
+            protected struct InputLock : IDisposable
+            {
+                private readonly ReplBackend _evaluator;
+
+                public InputLock(ReplBackend evaluator)
+                {
+                    Monitor.Enter(evaluator._inputLock);
+#if DEBUG
+                    Debug.Assert(evaluator._inputLockedThread == null);
+                    evaluator._inputLockedThread = Thread.CurrentThread;
+#endif
+                    _evaluator = evaluator;
+                }
+
+                public void Dispose()
+                {
+#if DEBUG
+                    _evaluator._inputLockedThread = null;
+#endif
+                    Monitor.Exit(_evaluator._inputLock);
                 }
             }
 
@@ -602,12 +636,12 @@ namespace J.Console
                 }
             }
 
-            protected struct ModuleTuple
+            protected struct LocaleTuple
             {
                 internal string Name;
                 internal string FileName;
 
-                internal ModuleTuple(string name, string fileName)
+                internal LocaleTuple(string name, string fileName)
                 {
                     this.Name = name;
                     this.FileName = fileName;
@@ -645,20 +679,6 @@ namespace J.Console
                     while (true)
                     {
                     }
-                }
-            }
-
-            /// <summary>
-            /// sends the current prompt to the interactive window
-            /// </summary>
-            internal void SendPrompt(string ps1, string ps2, bool updateAll = true)
-            {
-                using (new SocketLock())
-                {
-                    this._stream.Write(ReplBackend._PRPC);
-                    this.WriteString(ps1);
-                    this.WriteString(ps2);
-                    this._stream.WriteInt64(updateAll ? 1 : 0);
                 }
             }
 

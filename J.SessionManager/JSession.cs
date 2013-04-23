@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Collections.Generic;
 
 namespace J.SessionManager
 {
@@ -93,19 +93,20 @@ namespace J.SessionManager
             this._callbacks[1] = Marshal.GetFunctionPointerForDelegate((InteropDoWdType)((IntPtr jt, int x, ref A parg, ref IntPtr press) => doWdType(x, ref parg, ref press)));
         }
 
+        /// <summary>
+        /// inputType callback is called after an Explicit Definition : call
+        /// </summary>
         public void SetInput(InputType inputType)
         {
-            // Not sure when/how this gets used so this is was never tested
             this._callbacks[2] = Marshal.GetFunctionPointerForDelegate((InteropInputType)((jt, prompt) =>
                 {
-                    if (null == this._ptrInput)
+                    if (null == this._ptrInput || IntPtr.Zero == this._ptrInput)
                     {
                         this._byteInput = new byte[_maxInput];
                         this._ptrInput = Marshal.AllocHGlobal(_maxInput + 1);
                     }
                     string inp = inputType(prompt);
                     int byteCnt = Encoding.UTF8.GetBytes(inp, 0, inp.Length, this._byteInput, 0);
-                    System.Console.WriteLine(byteCnt);
                     Marshal.Copy(this._byteInput, 0, this._ptrInput, byteCnt);
                     Marshal.WriteByte(this._ptrInput, byteCnt, 0); // null terminated
                     return this._ptrInput;
