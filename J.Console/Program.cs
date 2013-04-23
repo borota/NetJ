@@ -16,10 +16,13 @@ namespace J.Console
         private static string _programName;
         private static CmdLineOptions _options;
 
-            private static int Main(string[] argv)
+        private static int Main(string[] argv)
         {
             try
             {
+                System.Console.InputEncoding = Encoding.Unicode;
+                System.Console.OutputEncoding = Encoding.UTF8;
+
                 _programName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
                 _options = new CmdLineOptions();
 
@@ -128,7 +131,7 @@ namespace J.Console
         private static string JInput(string prompt)
         {
             System.Console.Out.Write(prompt); System.Console.Out.Flush();
-            var line = System.Console.In.ReadLine();
+            var line = System.Console.ReadLine();
             if (null == line)
             {
                 if (IsConsoleInputRedirected())

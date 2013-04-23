@@ -75,14 +75,9 @@ namespace J.SessionManager
         public byte[] ByteFromPtr(IntPtr ptr)
         {
             var data = new List<byte>();
-            var off = 0;
-            while (true)
+            var off = 0; byte ch;
+            while (0 != (ch = Marshal.ReadByte(ptr, off++)))
             {
-                var ch = Marshal.ReadByte(ptr, off++);
-                if (ch == 0)
-                {
-                    break;
-                } 
                 data.Add(ch);
             }
             return data.ToArray();
@@ -94,7 +89,7 @@ namespace J.SessionManager
         }
 
         /// <summary>
-        /// inputType callback is called after an Explicit Definition : call
+        /// inputType callback is called after an Explicit Definition :
         /// </summary>
         public void SetInput(InputType inputType)
         {
