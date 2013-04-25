@@ -40,6 +40,8 @@ namespace J.SessionManager
             this._callbacks[0] = this._callbacks[1] = this._callbacks[2] = this._callbacks[3] = this._callbacks[4] = IntPtr.Zero;
             this._disposed = false;
             this._sid = JInit(); // might throw exception
+            this.SetDoWd(Wd.Parse); //wd set by default
+            this.ApplyCallbacks();
         }
 
         #endregion
@@ -52,7 +54,7 @@ namespace J.SessionManager
                 string o = null;
                 if (null != output && IntPtr.Zero != output)
                 {
-                    byte[] bo = this.ByteFromPtr(output);
+                    byte[] bo = JSession.BytesFromPtr(output);
                     o = Encoding.UTF8.GetString(bo);
                 }
                 outputType(type, o);
@@ -66,13 +68,13 @@ namespace J.SessionManager
                 byte[] o = null;
                 if (null != output && IntPtr.Zero != output)
                 {
-                    o = this.ByteFromPtr(output);
+                    o = JSession.BytesFromPtr(output);
                 }
                 outputType(type, o);
             })));
         }
 
-        public byte[] ByteFromPtr(IntPtr ptr)
+        public static byte[] BytesFromPtr(IntPtr ptr)
         {
             var data = new List<byte>();
             var off = 0; byte ch;
@@ -83,9 +85,19 @@ namespace J.SessionManager
             return data.ToArray();
         }
 
+        public static byte[] BytesFromPtr(IntPtr ptr, long sz)
+        {
+            var data = new List<byte>(); var off = 0;
+            while (0 < sz--)
+            {
+                data.Add(Marshal.ReadByte(ptr, off++));
+            }
+            return data.ToArray();
+        }
+
         public void SetDoWd(DoWdType doWdType)
         {
-            this._callbacks[1] = Marshal.GetFunctionPointerForDelegate((InteropDoWdType)((IntPtr jt, int x, ref A parg, ref IntPtr press) => doWdType(x, ref parg, ref press)));
+            this._callbacks[1] = Marshal.GetFunctionPointerForDelegate((InteropDoWdType)((IntPtr jt, int t, IntPtr w, ref IntPtr z) => doWdType(t, w, ref z)));
         }
 
         /// <summary>
@@ -240,15 +252,32 @@ namespace J.SessionManager
         public delegate void ByteOutputType(int type, byte[] output);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        public delegate int InteropDoWdType([In]IntPtr jt, [In]int x, ref A parg, ref IntPtr press); // never tested.
+        public delegate int InteropDoWdType([In]IntPtr jt, [In]int t, IntPtr w, ref IntPtr z);
 
-        public delegate int DoWdType(int x, ref A parg, ref IntPtr press);
+        public delegate int DoWdType(int x, IntPtr w, ref IntPtr press);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate IntPtr InteropInputType([In]IntPtr jt, [In][MarshalAs(UnmanagedType.LPStr)]string prompt);
 
         public delegate string InputType(string prompt);
+        #endregion
+    }
 
+#if WIN64
+    [StructLayoutAttribute(LayoutKind.Sequential)]
+    public struct A
+    {
+        public long k;
+        public long flag;
+        public long m;
+        public long t;
+        public long c;
+        public long n;
+        public long r;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1, ArraySubType = UnmanagedType.I8)]
+        public long[] s;
+    }
+#else
         [StructLayout(LayoutKind.Sequential)]
         public struct A
         {
@@ -262,7 +291,5 @@ namespace J.SessionManager
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1, ArraySubType = UnmanagedType.I4)]
             public int[] s;
         }
-
-        #endregion
-    }
+#endif
 }
