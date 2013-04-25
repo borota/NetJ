@@ -24,6 +24,7 @@ namespace J.Console
             Client
         }
 
+        [STAThread]
         private static int Main(string[] argv)
         {
             try
@@ -101,6 +102,7 @@ namespace J.Console
                             if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
                             System.Console.Out.Write(s); System.Console.Out.Flush();
                         });
+                        _jSession.SetDoWd(Wd.Parse);
                         _jSession.SetInput(JInput);
                         _jSession.ApplyCallbacks();
                     }

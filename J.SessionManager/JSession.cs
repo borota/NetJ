@@ -40,8 +40,6 @@ namespace J.SessionManager
             this._callbacks[0] = this._callbacks[1] = this._callbacks[2] = this._callbacks[3] = this._callbacks[4] = IntPtr.Zero;
             this._disposed = false;
             this._sid = JInit(); // might throw exception
-            this.SetDoWd(Wd.Parse); //wd set by default
-            this.ApplyCallbacks();
         }
 
         #endregion
@@ -54,7 +52,7 @@ namespace J.SessionManager
                 string o = null;
                 if (null != output && IntPtr.Zero != output)
                 {
-                    byte[] bo = JSession.BytesFromPtr(output);
+                    byte[] bo = this.BytesFromPtr(output);
                     o = Encoding.UTF8.GetString(bo);
                 }
                 outputType(type, o);
@@ -68,29 +66,19 @@ namespace J.SessionManager
                 byte[] o = null;
                 if (null != output && IntPtr.Zero != output)
                 {
-                    o = JSession.BytesFromPtr(output);
+                    o = this.BytesFromPtr(output);
                 }
                 outputType(type, o);
             })));
         }
 
-        public static byte[] BytesFromPtr(IntPtr ptr)
+        private byte[] BytesFromPtr(IntPtr ptr)
         {
             var data = new List<byte>();
             var off = 0; byte ch;
             while (0 != (ch = Marshal.ReadByte(ptr, off++)))
             {
                 data.Add(ch);
-            }
-            return data.ToArray();
-        }
-
-        public static byte[] BytesFromPtr(IntPtr ptr, long sz)
-        {
-            var data = new List<byte>(); var off = 0;
-            while (0 < sz--)
-            {
-                data.Add(Marshal.ReadByte(ptr, off++));
             }
             return data.ToArray();
         }
