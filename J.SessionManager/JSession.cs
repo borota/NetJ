@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -9,8 +11,12 @@ namespace J.SessionManager
     {
         #region - Field -
 
+        public static readonly string ProgramName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
+        public static readonly string ProgramPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+
         private readonly int _sid;
         private readonly IntPtr[] _callbacks;
+        private readonly string[] _jOptions;
         private bool _disposed;
         private const int _maxInput = 30000;
         private byte[] _byteInput;
@@ -33,14 +39,26 @@ namespace J.SessionManager
 
         #region - Constructor -
 
-        public JSession()
+        public JSession() : this(new string[0])
         {
+        }
+
+        public JSession(string[] jOptions)
+        {
+            this._jOptions = jOptions;
             this._sid = -1;
             this._callbacks = new IntPtr[5];
             this._callbacks[0] = this._callbacks[1] = this._callbacks[2] = this._callbacks[3] = this._callbacks[4] = IntPtr.Zero;
             this._disposed = false;
             this._sid = JInit(); // might throw exception
+            this.JeFirst();
         }
+
+        #endregion
+
+        #region - Property -
+
+        public string LastSentence { get; private set; }
 
         #endregion
 
@@ -124,8 +142,10 @@ namespace J.SessionManager
 
         public int Do(string sentence)
         {
+            this.LastSentence = sentence;
             if (this._sid > -1)
             {
+                if (null == sentence) return 0;
                 return JSession.JDo(this._sid, Encoding.UTF8.GetBytes(sentence));
             }
             return this._sid;
@@ -147,6 +167,54 @@ namespace J.SessionManager
                 return JSession.JIncAdBreak(this._sid);
             }
             return 0;
+        }
+
+        private string AddArgs()
+        {
+            var sb = new StringBuilder();
+            if (0 == this._jOptions.Length)
+            {
+                sb.Append(",<");
+            }
+            sb.Append('\'');
+            sb.Append(JSession.ProgramPath.Replace('\\', '/'));
+            sb.Append('\'');
+            foreach (var arg in this._jOptions)
+            {
+                sb.Append(";'");
+                sb.Append(arg.Replace("'", "''"));
+                sb.Append('\'');
+            }
+            return sb.ToString();
+        }
+
+        private int JeFirst()
+        {
+            var init = new StringBuilder();
+            if (this._jOptions.Length == 1 && this._jOptions[0] == "-jprofile") 
+            {
+                init.Append("i.0 0");
+            }
+            else if (this._jOptions.Length > 1 && this._jOptions[0] == "-jprofile") 
+            {
+                init.Append("(3 : '0!:0 y')2{ARGV");
+            }
+            else
+            {
+                init.Append("(3 : '0!:0 y')<BINPATH,'/profile.ijs'");
+            }
+                
+            init.Append("[ARGV_z_=:");
+            init.Append(AddArgs());
+            init.Append("[BINPATH_z_=:'");
+            string binPath = null;
+            if (null == (binPath = Environment.GetEnvironmentVariable("JPATH")))
+            {
+                binPath = Assembly.GetExecutingAssembly().Location;
+            }
+            init.Append(Path.GetDirectoryName(binPath).Replace('\\', '/'));
+            init.Append('\'');
+            return this.Do(init.ToString());
         }
 
         #region - IDispose -

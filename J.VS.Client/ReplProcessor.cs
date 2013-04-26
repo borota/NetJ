@@ -3,14 +3,13 @@
  */
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using J.SessionManager;
 
-namespace J.Console
+namespace J.VS.Client
 {
     internal class ReplProcessor
     {
@@ -206,7 +205,7 @@ namespace J.Console
 
             internal void Connect()
             {
-                this._conn = new TcpClient(this._replProc._cmdLine.Server, this._replProc._cmdLine.Ports[0]);
+                this._conn = new TcpClient(this._replProc._cmdLine.Server, this._replProc._cmdLine.Port);
                 this._stream = this._conn.GetStream();
                 this._replProc._replThread = new Thread(this.ReplLoop); // start a new thread for communicating w/ the remote process
             }

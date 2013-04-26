@@ -15,10 +15,10 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Sockets;
 using System.Text;
 
-namespace J.Console {
+namespace J.VS.Client
+{
     static class Extensions {
         /// <summary>
         /// Reads a string from the socket which is encoded as:

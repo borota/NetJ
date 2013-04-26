@@ -1,10 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
 using System.Windows.Forms;
 
 namespace J.SessionManager.Test
@@ -16,50 +10,81 @@ namespace J.SessionManager.Test
 
         public Form1()
         {
-            InitializeComponent();
-            this._form2 = new Form2();
+            try
+            {
+                InitializeComponent();
+                this._form2 = new Form2();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Critical Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            _jSession = new JSession();
-            _jSession.SetStringOutput((type, output) =>
+            try
             {
-                this.textBox2.Text +=  output.Replace("\n", "\r\n");
-                this.textBox2.SelectionStart = this.textBox2.Text.Length;
-                this.textBox2.ScrollToCaret();
-            });
-            _jSession.SetInput((p) =>
+                _jSession = new JSession();
+                _jSession.SetStringOutput((type, output) =>
+                {
+                    if (null != output)
+                    {
+                        this.textBox2.Text += output.Replace("\n", "\r\n");
+                        this.textBox2.SelectionStart = this.textBox2.Text.Length;
+                        this.textBox2.ScrollToCaret();
+                    }
+                });
+                _jSession.SetInput((p) =>
+                {
+                    this._form2.ShowDialog();
+                    var result = this._form2.textBox1.Text;
+                    this.textBox2.Text += result + "\r\n";
+                    this.textBox2.SelectionStart = this.textBox2.Text.Length;
+                    this.textBox2.ScrollToCaret();
+                    return result;
+                });
+                _jSession.ApplyCallbacks();
+            }
+            catch (Exception ex)
             {
-                this._form2.ShowDialog();
-                var result = this._form2.textBox1.Text;
-                this.textBox2.Text += result + "\r\n";
-                this.textBox2.SelectionStart = this.textBox2.Text.Length;
-                this.textBox2.ScrollToCaret();
-                return result;
-            });
-            _jSession.ApplyCallbacks();
+                MessageBox.Show(ex.Message, "Critical Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            _jSession.Dispose();
+            try
+            {
+                _jSession.Dispose();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Critical Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            var sentence = this.textBox1.Text.Trim();
-            if (string.Empty == sentence)
+            try
             {
-                MessageBox.Show(this, "Please enter sentence to execute!");
+                var sentence = this.textBox1.Text.Trim();
+                if (string.Empty == sentence)
+                {
+                    MessageBox.Show(this, "Please enter sentence to execute!");
+                }
+                else
+                {
+                    this.textBox1.Text = string.Empty;
+                    this.textBox2.Text += "    " + sentence + "\r\n";
+                    this.textBox2.SelectionStart = this.textBox2.Text.Length;
+                    this.textBox2.ScrollToCaret();
+                    _jSession.Do(sentence);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                this.textBox1.Text = string.Empty;
-                this.textBox2.Text += "    " + sentence + "\r\n";
-                this.textBox2.SelectionStart = this.textBox2.Text.Length;
-                this.textBox2.ScrollToCaret();
-                _jSession.Do(sentence);
+                MessageBox.Show(ex.Message, "Critical Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
