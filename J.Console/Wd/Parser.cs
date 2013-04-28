@@ -2,37 +2,20 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows;
 
-
-namespace J.SessionManager
+namespace J.Wd
 {
-    internal static class Wd
+    public class Parser
     {
         public const int EVDOMAIN = 3;
 
         public const int LIT = 2;
-        
-        private static readonly char[] ws = new char[] { ' ', '\r', '\n', '\t' };
-        private static string mainWindowId = "Main Window";
-        private static Application application;
 
-        private static JWindow mainWindow;
-        private static JWindow MainWindow
-        {
-            get
-            {
-                if (null == mainWindow)
-                {
-                    mainWindow = new JWindow(mainWindowId);
-                }
-                return mainWindow;
-            }
-            set
-            {
-                mainWindow = value;
-            }
-        }
+        public static readonly char[] ws = new char[] { ' ', '\r', '\n', '\t' };
+        public static string mainWindowId = "Main Window";
+        
+        private static bool IsWdSet = false;
+        private static bool UseWF = false;
 
 #if WIN64
         private const int iSz = sizeof(long);
@@ -120,7 +103,7 @@ namespace J.SessionManager
         //#define CAV(x)          (      (C*)(x)+AK(x) )  /* character               */
         private static string CAV(IntPtr a)
         {
-            return Encoding.UTF8.GetString(Wd.BytesFromPtr(AV(a), AN(a)));
+            return Encoding.UTF8.GetString(Parser.BytesFromPtr(AV(a), AN(a)));
         }
 
         private static byte[] BytesFromPtr(IntPtr ptr, long sz)
@@ -133,47 +116,58 @@ namespace J.SessionManager
             return data.ToArray();
         }
 
-        internal static int Parse(int t, IntPtr w, ref IntPtr z)
+        public static int Parse(int t, IntPtr w, ref IntPtr z)
         {
-            if (0 != t || AT(w) != Wd.LIT)
+            if (0 != t || AT(w) != Parser.LIT)
             {
-                return Wd.EVDOMAIN; // only 11!:0 supported and only literal params please.
+                return Parser.EVDOMAIN; // only 11!:0 supported and only literal params please.
             }
             string wdArg = CAV(w);
             if (null == wdArg || string.Empty == (wdArg = wdArg.Trim()))
             {
-                return Wd.EVDOMAIN; // should probably be different error, not sure which one though
+                return Parser.EVDOMAIN; // should probably be different error, not sure which one though
             }
             string[] argv = wdArg.Split(ws, StringSplitOptions.RemoveEmptyEntries);
             switch (argv[0])
             {
+                case "wf":
+                    if (!Parser.IsWdSet)
+                    {
+                        Parser.UseWF = true;
+                        Parser.IsWdSet = true;
+                    }
+                    break;
                 case "pc":
+                    Parser.IsWdSet = true;
                     if (2 > argv.Length)
                     {
-                        return Wd.EVDOMAIN; // should probably be different error, not sure which one though                    
+                        return Parser.EVDOMAIN; // should probably be different error, not sure which one though                    
                     }
                     mainWindowId = argv[1];
-                    MainWindow = new JWindow(mainWindowId);
+                    if (Parser.UseWF)
+                    {
+                        FWd.CreateParent(mainWindowId);
+                    }
+                    else
+                    {
+                        XWd.CreateParent(mainWindowId);
+                    }
                     break;
                 case "pshow":
-                    application = new Application();
-                    application.Exit += (sender, e) => { MainWindow = null; Environment.Exit(e.ApplicationExitCode); };
-                    application.Run(MainWindow);
+                    Parser.IsWdSet = true;
+                    if (Parser.UseWF)
+                    {
+                        FWd.ShowParent();
+                    }
+                    else
+                    {
+                        XWd.ShowParent();
+                    }
                     break;
                 default:
-                    return Wd.EVDOMAIN; // should probably be different error, not sure which one though
+                    return Parser.EVDOMAIN; // should probably be different error, not sure which one though
             }
             return 0;
-        }
-
-        internal class JWindow : Window
-        {
-            public string Id;
-            public JWindow(string id)
-            {
-                this.Id = id;
-                this.Title = this.Id;
-            }
         }
     }
 }

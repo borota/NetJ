@@ -63,17 +63,14 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\J.SessionManager\JSession.cs">
+      <Link>JSession.cs</Link>
+    </Compile>
     <Compile Include="Extensions.cs" />
     <Compile Include="Options.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReplProcessor.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\J.SessionManager\J.SessionManager.csproj">
-      <Project>{A7D9C1F7-5159-4E8E-A409-AF683BB2AA3E}</Project>
-      <Name>J.SessionManager</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

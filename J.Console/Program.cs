@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using J.SessionManager;
+using J.Wd;
 using NDesk.Options;
 
 namespace J.Console
@@ -70,7 +71,7 @@ namespace J.Console
                             if (JSession.MTYOEXIT == tp) Environment.Exit(tp);
                             System.Console.Out.Write(s); System.Console.Out.Flush();
                         });
-                        _jSession.SetDoWd(Wd.Parse);
+                        _jSession.SetDoWd(Parser.Parse);
                         _jSession.SetInput(JInput);
                         _jSession.ApplyCallbacks();
                     }

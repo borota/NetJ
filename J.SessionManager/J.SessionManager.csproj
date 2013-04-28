@@ -71,12 +71,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="JSession.cs" />
@@ -84,7 +78,10 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>COPY $(SolutionDir)J.701\x64\profile.ijs $(SolutionDir)J.701\bin\profile.ijs</PostBuildEvent>
+    <PostBuildEvent>COPY /Y "$(SolutionDir)J.701\x64\profile.ijs" "$(SolutionDir)J.701\bin\profile.ijs"
+IF EXIST "$(SolutionDir)J.701\bin\j.dll" DEL /F "$(SolutionDir)J.701\bin\j.dll"
+IF '$(Platform)'=='x86' COPY /Y "$(SolutionDir)J.701\x86\j.dll" "$(SolutionDir)J.701\bin\j.dll"
+IF '$(Platform)'=='x64' COPY /Y "$(SolutionDir)J.701\x64\j.dll" "$(SolutionDir)J.701\bin\j.dll"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
