@@ -118,14 +118,14 @@ namespace J.Wd
 
         public static int Parse(int t, IntPtr w, ref IntPtr z)
         {
-            if (0 != t || AT(w) != Parser.LIT)
+            if (0 != t || 0 == AN(w) || AT(w) != Parser.LIT)
             {
                 return Parser.EVDOMAIN; // only 11!:0 supported and only literal params please.
             }
             string wdArg = CAV(w);
             if (null == wdArg || string.Empty == (wdArg = wdArg.Trim()))
             {
-                return Parser.EVDOMAIN; // should probably be different error, not sure which one though
+                return 0;
             }
             string[] argv = wdArg.Split(ws, StringSplitOptions.RemoveEmptyEntries);
             switch (argv[0])

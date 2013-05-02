@@ -62,6 +62,7 @@ namespace J.SessionManager
             JSession.JSM = JSession.JeLibrary.GetUnmanagedFunction<JSMType>("JSM");
             JSession.JDo = JSession.JeLibrary.GetUnmanagedFunction<JDoType>("JDo");
             JSession.JGetLocale = JSession.JeLibrary.GetUnmanagedFunction<JGetLocaleType>("JGetLocale");
+            JSession.Jga = JSession.JeLibrary.GetUnmanagedFunction<JgaType>("Jga");
             JSession.JFree = JSession.JeLibrary.GetUnmanagedFunction<JFreeType>("JFree");
         }
 
@@ -310,6 +311,27 @@ namespace J.SessionManager
         private delegate IntPtr JGetLocaleType([In]JtHandle jt);
         private static JGetLocaleType JGetLocale;
 
+#if WIN64
+        /// Return Type: A
+        ///param0: void*
+        ///param1: I->long
+        ///param2: I->long
+        ///param3: I->long
+        ///param4: I*
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate IntPtr JgaType(IntPtr jt, long t, long n, long r, ref long s);
+        private static JgaType Jga;
+#else
+        /// Return Type: A
+        ///param0: void*
+        ///param1: I->int
+        ///param2: I->int
+        ///param3: I->int
+        ///param4: I*
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate IntPtr JgaType(IntPtr jt, int t, int n, int r, ref int s);
+        private static JgaType Jga;
+#endif
         /// Return Type: int
         ///jt: void*
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -328,7 +350,6 @@ namespace J.SessionManager
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate IntPtr InteropInputType([In]IntPtr jt, [In][MarshalAs(UnmanagedType.LPStr)]string prompt);
         public delegate string InputType(string prompt);
-
         /*
 
 [DllImport(_dllName)]
@@ -344,16 +365,14 @@ private static extern int JSetA(int sid, int n, [MarshalAs(UnmanagedType.LPStr)]
 private static extern int JSetM(int sid, [MarshalAs(UnmanagedType.LPStr)]string name, ref int jtype, ref int jrank, ref int jshape, ref int jdata);
 
 [DllImport(_dllName)]
-private static extern System.IntPtr Jga(int sid, int t, int n, int r, ref int s);
-
-[DllImport(_dllName)]
 private static extern int JErrorTextM(int sid, int ec, ref int p);
 
 [DllImport(_dllName)]
 private static extern int JFree(int sid);
 
 [DllImport(_dllName)]
-private static extern System.IntPtr JGetJt(int sid);*/
+private static extern System.IntPtr JGetJt(int sid);
+*/
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         static extern IntPtr GetModuleHandle(string moduleName);
