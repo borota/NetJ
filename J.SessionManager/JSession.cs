@@ -10,6 +10,8 @@ using Microsoft.Win32.SafeHandles;
 
 namespace J.SessionManager
 {
+    #region - JSession -
+
     public class JSession : IDisposable
     {
         #region - Field -
@@ -59,6 +61,7 @@ namespace J.SessionManager
             JSession.JInit = JSession.JeLibrary.GetUnmanagedFunction<JInitType>("JInit");
             JSession.JSM = JSession.JeLibrary.GetUnmanagedFunction<JSMType>("JSM");
             JSession.JDo = JSession.JeLibrary.GetUnmanagedFunction<JDoType>("JDo");
+            JSession.JGetLocale = JSession.JeLibrary.GetUnmanagedFunction<JGetLocaleType>("JGetLocale");
             JSession.JFree = JSession.JeLibrary.GetUnmanagedFunction<JFreeType>("JFree");
         }
 
@@ -163,6 +166,12 @@ namespace J.SessionManager
         {
             this.LastSentence = sentence;
             return (null == sentence ? 0 : JSession.JDo(this._jt, Encoding.UTF8.GetBytes(sentence)));
+        }
+
+        public string GetLocale()
+        {
+            IntPtr locale = JSession.JGetLocale(this._jt);
+            return Encoding.UTF8.GetString(this.BytesFromPtr(locale));
         }
 
         public byte IncAdBreak()
@@ -295,6 +304,12 @@ namespace J.SessionManager
         private delegate int JDoType([In]JtHandle jt,  [In]byte[] sentence);
         private static JDoType JDo;
 
+        /// Return Type: C*
+        ///jt: void*
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate IntPtr JGetLocaleType([In]JtHandle jt);
+        private static JGetLocaleType JGetLocale;
+
         /// Return Type: int
         ///jt: void*
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
@@ -315,9 +330,6 @@ namespace J.SessionManager
         public delegate string InputType(string prompt);
 
         /*
-
-[DllImport(_dllName)]
-private static extern string JGetLocale(int sid);
 
 [DllImport(_dllName)]
 private static extern System.IntPtr JGetA(int sid, int n, [MarshalAs(UnmanagedType.LPStr)]string name);
@@ -422,7 +434,10 @@ private static extern System.IntPtr JGetJt(int sid);*/
         }
 #endif
 
-/******************************** Module Header ********************************\
+    #endregion
+
+    #region - UnmanagedLibrary -
+    /******************************** Module Header ********************************\
 * Module Name:  UnmanagedLibrary.cs
 * Project:      CSLoadLibrary
 * Copyright (c) Microsoft Corporation.
@@ -590,4 +605,6 @@ private static extern System.IntPtr JGetJt(int sid);*/
 
         #endregion
     }
+
+    #endregion
 }
